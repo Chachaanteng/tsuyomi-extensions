@@ -12,6 +12,7 @@
     "package:fixture": "npm run build && node tools/build-fixture.mjs",
     "package:hxp": "node tools/package-hxp.mjs",
     "catalog:generate": "node tools/generate-catalog.mjs",
+    "release:prepare": "node tools/prepare-release.mjs",
     "test": "npm run build && node --test test/*.test.mjs"
   },
   "devDependencies": {

@@ -4,7 +4,7 @@
 version = 1
 
 [[annotations]]
-path = ["fixtures/wenku8/**", "package.json", "package-lock.json", "tsconfig.json", "NOTICE"]
+path = ["fixtures/wenku8/**", "release/*.json", "package.json", "package-lock.json", "tsconfig.json", "NOTICE"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Tsuyomi Contributors"
 SPDX-License-Identifier = "AGPL-3.0-only"

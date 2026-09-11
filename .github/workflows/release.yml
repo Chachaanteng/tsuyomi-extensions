@@ -1,0 +1,169 @@
+# SPDX-FileCopyrightText: 2026 Tsuyomi Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+name: Official distribution
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'release/**'
+      - 'tools/**'
+      - 'test/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/**'
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Release reviewed main or renew the existing catalog
+        type: choice
+        options: [release, renew]
+        default: release
+        required: true
+
+permissions:
+  contents: read
+
+# One writer for both releases and renewal. Never interrupt a partial publication.
+concurrency:
+  group: official-repository-publication
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: >-
+      github.repository == 'Chachaanteng/tsuyomi-extensions' &&
+      github.ref == 'refs/heads/main' &&
+      vars.OFFICIAL_DISTRIBUTION_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
+      bundle_sha256: ${{ steps.bundle.outputs.sha256 }}
+    steps:
+      - id: mode
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_MODE: ${{ inputs.mode }}
+        run: |
+          if [ "$EVENT_NAME" = schedule ] || [ "$REQUESTED_MODE" = renew ]; then
+            echo 'mode=renew' >> "$GITHUB_OUTPUT"
+          else
+            echo 'mode=release' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        if: steps.mode.outputs.mode == 'release'
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        if: steps.mode.outputs.mode == 'release'
+        with:
+          node-version: 20.18.0
+      - name: Validate without production credentials
+        if: steps.mode.outputs.mode == 'release'
+        run: npm ci --ignore-scripts && npm test
+      - name: Prepare data-only input
+        id: bundle
+        if: steps.mode.outputs.mode == 'release'
+        env:
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          node tools/prepare-release.mjs --revision "$SOURCE_REVISION" --output release-input.json
+          echo "sha256=$(sha256sum release-input.json | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: steps.mode.outputs.mode == 'release'
+        with:
+          name: release-input-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-input.json
+          if-no-files-found: error
+          retention-days: 2
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: official-distribution
+    permissions:
+      contents: write
+    steps:
+      - name: Require an explicitly pinned signing tool revision
+        env:
+          TOOL_REVISION: ${{ vars.RELEASE_TOOL_REVISION }}
+        run: |
+          [[ "$TOOL_REVISION" =~ ^[0-9a-f]{40}$ ]] || { echo 'Configure the reviewed signing-tool commit before activation.'; exit 1; }
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ vars.RELEASE_TOOL_REVISION }}
+          persist-credentials: false
+          path: signing-tools
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20.18.0
+      # Install only the pinned tool lockfile, with lifecycle scripts disabled.
+      # No shared build-job cache or source checkout enters this runner.
+      - name: Install pinned signing-tool dependencies without secrets
+        working-directory: signing-tools
+        run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        if: needs.prepare.outputs.mode == 'release'
+        with:
+          name: release-input-${{ github.run_id }}-${{ github.run_attempt }}
+          path: incoming
+      - name: Check input transfer digest
+        if: needs.prepare.outputs.mode == 'release'
+        env:
+          BUNDLE_SHA256: ${{ needs.prepare.outputs.bundle_sha256 }}
+        run: |
+          [[ "$BUNDLE_SHA256" =~ ^[0-9a-f]{64}$ ]] || exit 1
+          printf '%s  incoming/release-input.json\n' "$BUNDLE_SHA256" | sha256sum --check --strict
+      - name: Sign and publish verified data
+        working-directory: signing-tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SOURCE_REVISION: ${{ github.sha }}
+          REPOSITORY_ROOT_KEY_ID: ${{ vars.REPOSITORY_ROOT_KEY_ID }}
+          REPOSITORY_ROOT_PUBLIC_KEY: ${{ vars.REPOSITORY_ROOT_PUBLIC_KEY }}
+          REPOSITORY_ROOT_PRIVATE_KEY: ${{ secrets.REPOSITORY_ROOT_PRIVATE_KEY }}
+          EXTENSION_PUBLISHER_KEY_ID: ${{ vars.EXTENSION_PUBLISHER_KEY_ID }}
+          EXTENSION_PUBLISHER_PUBLIC_KEY: ${{ vars.EXTENSION_PUBLISHER_PUBLIC_KEY }}
+          EXTENSION_PUBLISHER_PRIVATE_KEY: ${{ needs.prepare.outputs.mode == 'release' && secrets.EXTENSION_PUBLISHER_PRIVATE_KEY || '' }}
+          ALLOW_INITIAL_PUBLICATION: ${{ vars.ALLOW_INITIAL_PUBLICATION }}
+          PUBLICATION_MODE: ${{ needs.prepare.outputs.mode }}
+        run: |
+          if [ "$PUBLICATION_MODE" = release ]; then
+            node tools/publish-repository.mjs --mode release --bundle ../incoming/release-input.json --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          else
+            node tools/publish-repository.mjs --mode renew --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          fi
+
+  notify:
+    needs: [prepare, publish]
+    if: >-
+      always() && github.repository == 'Chachaanteng/tsuyomi-extensions' &&
+      (needs.prepare.result == 'failure' || needs.publish.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      # Do not checkout or execute contribution content with an issue-write token.
+      - name: Create or update the distribution failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          title='Official distribution needs attention'
+          number=$(gh issue list --repo "$REPOSITORY" --state open --search "$title in:title" --json number,title --jq '.[] | select(.title == "Official distribution needs attention") | .number' | sort -n | sed -n '1p')
+          body="Signing, publication, or catalog renewal failed. Inspect this run before retrying: $RUN_URL . No failure authorizes bypassing signature, version, or revocation checks."
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$REPOSITORY" --title "$title" --body "$body"
+          fi

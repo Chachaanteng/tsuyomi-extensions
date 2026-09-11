@@ -7,6 +7,8 @@
 |---|---:|---|---|
 | actions/checkout | 4.2.2 (`11bd71901bbe5b1630ceea73d27597364c9af683`) | MIT | GitHub Actions source checkout only |
 | actions/setup-node | 4.4.0 (`49933ea5288caeca8642d1e84afbd3f7d6820020`) | MIT | GitHub Actions Node runtime setup only |
+| actions/upload-artifact | commit `ea165f8d65b6e75b540449e92b4886f43607fa02` | MIT | transfer unsigned data-only release input between isolated jobs; no private keys |
+| actions/download-artifact | commit `d3f86a106a0bac45b974a628896c90dbdf5c8093` | MIT | retrieve same-run unsigned input for independent digest validation |
 | TypeScript | 7.0.2 | Apache-2.0 | development-only compiler; not distributed in HXP archives |
 | Ajv | 8.20.0 | MIT | development-only validation of the vendored HXP manifest schema |
 | ajv-formats | 3.0.1 | MIT | development-only URI format support for Ajv |

@@ -41,8 +41,12 @@ The production HXP packager validates its completed manifest against the verbati
 
 ## Publication boundary
 
-This source repository contains build inputs and offline signing tools only.
-It contains no production signing key, released HXP asset, published catalog
-index, catalog branch, or release claim. Producing or publishing a formal
-package/catalog requires a separately supplied key and an explicit release
-approval.
+This source repository contains build inputs, offline signing tools and an
+activation-gated automated distribution workflow. No production key is stored
+in source. Initial production-key configuration and first activation require
+separate authorization. Once activated, maintainer-reviewed release changes
+merged into protected main authorize routine automated publication without a
+second per-release approval; catalog renewal is automatic. Corresponding
+source is bound to the exact released commit and retains both current AGPL
+and historical Apache notices. Workflow implementation alone is not evidence
+that any signed catalog, catalog branch or formal HXP release is live.
