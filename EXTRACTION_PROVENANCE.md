@@ -35,6 +35,10 @@ verbatim Apache-2.0 text remain available in this repository. `LICENSE` and
 Apache provenance and notice obligations. No custom license exception is
 created by this transition.
 
+## Vendored protocol schema
+
+The production HXP packager validates its completed manifest against the verbatim Apache-2.0 `hxp-manifest-v1.schema.json` copied from `Xfire233/Tsuyomi` checkpoint `09e0cb7`, path `tsuyomi-protocol/schemas/hxp-manifest-v1.schema.json`. The source and vendored Git blob is `af1107f7987386c07ae9d4646a635f354cb50355`; its content SHA-256 is `1ff7d570d702229539317f54951ea53dfb7aa50a1c31d5f79287c967b47bbeb2`. The Apache-2.0 text and notice are retained; this is a pinned compatibility input, not a sibling-directory dependency or a protocol release claim.
+
 ## Publication boundary
 
 This source repository contains build inputs and offline signing tools only.

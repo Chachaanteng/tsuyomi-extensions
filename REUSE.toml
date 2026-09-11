@@ -4,7 +4,13 @@
 version = 1
 
 [[annotations]]
-path = ["fixtures/wenku8/**"]
+path = ["fixtures/wenku8/**", "package.json", "package-lock.json", "tsconfig.json", "NOTICE"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Tsuyomi Contributors"
 SPDX-License-Identifier = "AGPL-3.0-only"
+
+[[annotations]]
+path = ["schemas/hxp-manifest-v1.schema.json"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Tsuyomi Contributors"
+SPDX-License-Identifier = "Apache-2.0"

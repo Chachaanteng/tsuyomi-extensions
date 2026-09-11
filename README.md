@@ -55,10 +55,7 @@ npm run package:hxp -- \
   --output out/example.hxp
 ```
 
-The template supplies normal HXP fields including `entry` and `signing`; the
-tool derives `integrity.files`, `contentDigest`, a canonical manifest, and the
-detached Ed25519 signature. It uses fixed ZIP metadata and refuses to overwrite
-an existing artifact. A generated HXP is not a release.
+The template supplies all required HXP fields except `integrity`; the tool derives `integrity.files`, `contentDigest`, a canonical manifest, and the detached Ed25519 signature. Before signing, it validates that completed manifest against the pinned Apache-2.0 `schemas/hxp-manifest-v1.schema.json` (provenance in `EXTRACTION_PROVENANCE.md`) and applies the Android host's capability-policy admission rules, including canonical origin containment and remote-library operation constraints. It rejects entries over 8 MiB, more than 256 total archive files, manifests over 128 KiB, and archives over 16 MiB; it uses fixed ZIP metadata and refuses to overwrite an existing artifact. A generated HXP is not a release.
 
 ## Offline catalog generation
 

@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { sign } from 'node:crypto';
+import { isIP } from 'node:net';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import {
   assertExactKeys,
   assertObject,
+  assertCodePointString,
   assertSafePositiveInteger,
   assertString,
   canonicalize,
@@ -21,13 +23,12 @@ const FIXTURE_PUBLIC_KEY_BASE64 = 'ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ='
 const MAX_CATALOG_BYTES = 1024 * 1024;
 const MAX_PACKAGES = 512;
 const MAX_PUBLISHERS = 32;
-const MAX_REVOCATIONS = 512;
-const KEY_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/;
-const SOURCE_ID = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$/;
+const KEY_ID = /^[A-Za-z0-9._-]{8,128}$/;
+const SOURCE_ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$/;
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
-const SHA256_HEX = /^[0-9a-f]{64}$/;
+const SHA_256_HEX = /^[0-9a-f]{64}$/;
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
-const UTC_INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?Z$/;
+const UTC_INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z$/;
 
 const usage = `Usage:
   node tools/generate-catalog.mjs --input <catalog-input.json> --private-key <pkcs8.pem|der>
@@ -66,12 +67,12 @@ const parseArguments = (argumentsList) => {
 };
 
 const parseInstant = (value, label) => {
-  assertString(value, label, { min: 20, max: 30, pattern: UTC_INSTANT });
+  assertString(value, label, { min: 20, max: 24, pattern: UTC_INSTANT });
   const match = UTC_INSTANT.exec(value);
   const timestamp = Date.parse(value);
   if (!Number.isFinite(timestamp)) fail(`${label} must be a valid UTC instant`);
   const parsed = new Date(timestamp);
-  const milliseconds = Number((match[7] ?? '').padEnd(3, '0').slice(0, 3));
+  const milliseconds = Number((match[7] ?? '').padEnd(3, '0'));
   if (parsed.getUTCFullYear() !== Number(match[1]) ||
       parsed.getUTCMonth() + 1 !== Number(match[2]) ||
       parsed.getUTCDate() !== Number(match[3]) ||
@@ -83,24 +84,53 @@ const parseInstant = (value, label) => {
   }
   return timestamp;
 };
+const assertJavaCompatibleHost = (hostname, label) => {
+  const literal = hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname;
+  if (isIP(literal) === 6) return;
+  const labels = hostname.endsWith('.') ? hostname.slice(0, -1).split('.') : hostname.split('.');
+  if (labels.length === 0 || labels.some((part) => !/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(part))) {
+    fail(`${label} must have a Java-compatible DNS or IPv6 host`);
+  }
+};
+
 
 const assertHttpsUrl = (value, label) => {
-  assertString(value, label, { min: 12, max: 2048 });
+  const raw = assertString(value, label, { min: 12, max: 4096 });
+  if (!/^https:\/\//i.test(raw) || /[^\u0021-\u007e]|[\\#]/.test(raw) || /%(?![0-9A-Fa-f]{2})/.test(raw)) {
+    fail(`${label} must be a raw ASCII HTTPS URI without whitespace, backslashes, or a fragment`);
+  }
+  const afterScheme = raw.slice(raw.indexOf('//') + 2);
+  const suffixOffset = afterScheme.search(/[/?]/);
+  const authority = suffixOffset === -1 ? afterScheme : afterScheme.slice(0, suffixOffset);
+  const suffix = suffixOffset === -1 ? '' : afterScheme.slice(suffixOffset);
+  if (authority.includes('@')) fail(`${label} must not include user info`);
+  if (!/^(?:\/[A-Za-z0-9\-._~!$&'()*+,;=:@%]*)*(?:\?[A-Za-z0-9\-._~!$&'()*+,;=:@%/?]*)?$/.test(suffix)) {
+    fail(`${label} must have Java-compatible raw path and query syntax`);
+  }
   let url;
   try {
-    url = new URL(value);
+    url = new URL(raw);
   } catch {
     fail(`${label} must be an HTTPS URL`);
   }
-  if (url.protocol !== 'https:' || url.username !== '' || url.password !== '' || url.hash !== '' || url.hostname === '') {
-    fail(`${label} must be an HTTPS URL without credentials or a fragment`);
+  if (url.protocol !== 'https:' || url.username !== '' || url.password !== '' || url.hostname === '' || url.port !== '' && Number(url.port) > 65535) {
+    fail(`${label} must be an HTTPS URL without credentials`);
   }
-  return value;
+  assertJavaCompatibleHost(url.hostname, label);
+  const canonical = url.toString();
+  if (canonical.length < 12 || canonical.length > 4096) fail(`${label} is outside the repository URI length bound`);
+  return canonical;
 };
 
 const assertSemVer = (value, label) => {
   assertString(value, label, { min: 5, max: 128, pattern: SEMVER });
-  const preRelease = SEMVER.exec(value)[4];
+  const match = SEMVER.exec(value);
+  for (const component of match.slice(1, 4)) {
+    if (component.length > 10 || component.length === 10 && component > '2147483647') {
+      fail(`${label} exceeds the host SemanticVersion integer range`);
+    }
+  }
+  const preRelease = match[4];
   if (preRelease !== undefined) {
     for (const identifier of preRelease.split('.')) {
       if (/^\d+$/.test(identifier) && identifier.length > 1 && identifier.startsWith('0')) {
@@ -152,16 +182,16 @@ const compareSemVer = (left, right) => {
   return comparePreRelease(leftParts[3], rightParts[3]);
 };
 
-const assertStringArray = (value, label, pattern) => {
-  if (!Array.isArray(value) || value.length > MAX_REVOCATIONS) fail(`${label} must contain at most ${MAX_REVOCATIONS} strings`);
-  const values = value.map((item, index) => assertString(item, `${label}[${index}]`, { min: 64, max: 64, pattern }));
+const assertDigestArray = (value, label, maximum) => {
+  if (!Array.isArray(value) || value.length > maximum) fail(`${label} must contain at most ${maximum} digests`);
+  const values = value.map((item, index) => assertString(item, `${label}[${index}]`, { min: 64, max: 64, pattern: SHA_256_HEX }));
   if (new Set(values).size !== values.length) fail(`${label} must not contain duplicate values`);
   return values;
 };
 
 const validatePublisher = (publisher, index) => {
   assertExactKeys(publisher, ['keyId', 'publicKey'], `publishers[${index}]`);
-  const keyId = assertString(publisher.keyId, `publishers[${index}].keyId`, { min: 1, max: 64, pattern: KEY_ID });
+  const keyId = assertString(publisher.keyId, `publishers[${index}].keyId`, { min: 8, max: 128, pattern: KEY_ID });
   const publicKey = assertString(publisher.publicKey, `publishers[${index}].publicKey`, { min: 44, max: 44 });
   const publicKeyBytes = decodeBase64(publicKey, `publishers[${index}].publicKey`, 32);
   return { keyId, publicKey, fingerprint: sha256(publicKeyBytes) };
@@ -170,8 +200,8 @@ const validatePublisher = (publisher, index) => {
 const validateLegacyMigration = (value, label) => {
   assertExactKeys(value, ['fromPublisherFingerprint', 'fromPackageSha256'], label);
   return {
-    fromPublisherFingerprint: assertString(value.fromPublisherFingerprint, `${label}.fromPublisherFingerprint`, { min: 64, max: 64, pattern: SHA256_HEX }),
-    fromPackageSha256: assertString(value.fromPackageSha256, `${label}.fromPackageSha256`, { min: 64, max: 64, pattern: SHA256_HEX }),
+    fromPublisherFingerprint: assertString(value.fromPublisherFingerprint, `${label}.fromPublisherFingerprint`, { min: 64, max: 64, pattern: SHA_256_HEX }),
+    fromPackageSha256: assertString(value.fromPackageSha256, `${label}.fromPackageSha256`, { min: 64, max: 64, pattern: SHA_256_HEX }),
   };
 };
 
@@ -181,22 +211,22 @@ const validatePackage = (candidate, index, publisherKeyIds) => {
   const baseKeys = ['id', 'name', 'version', 'summary', 'language', 'license', 'sourceUrl', 'sourceRevision', 'downloadUrl', 'size', 'sha256', 'hostApi', 'publisherKeyId'];
   const keys = Object.hasOwn(candidate, 'legacyMigration') ? [...baseKeys, 'legacyMigration'] : baseKeys;
   assertExactKeys(candidate, keys, label);
-  const id = assertString(candidate.id, `${label}.id`, { min: 3, max: 128, pattern: SOURCE_ID });
-  const name = assertString(candidate.name, `${label}.name`, { min: 1, max: 160 });
+  const id = assertCodePointString(candidate.id, `${label}.id`, { min: 3, max: 128, pattern: SOURCE_ID });
+  const name = assertCodePointString(candidate.name, `${label}.name`, { min: 1, max: 128 });
   const version = assertSemVer(candidate.version, `${label}.version`);
-  const summary = assertString(candidate.summary, `${label}.summary`, { min: 1, max: 1024 });
-  const language = assertString(candidate.language, `${label}.language`, { min: 2, max: 64 });
-  const license = assertString(candidate.license, `${label}.license`, { min: 3, max: 128 });
+  const summary = assertCodePointString(candidate.summary, `${label}.summary`, { min: 1, max: 1024 });
+  const language = assertCodePointString(candidate.language, `${label}.language`, { min: 1, max: 64 });
+  const license = assertCodePointString(candidate.license, `${label}.license`, { min: 1, max: 128 });
   const sourceUrl = assertHttpsUrl(candidate.sourceUrl, `${label}.sourceUrl`);
   const sourceRevision = assertString(candidate.sourceRevision, `${label}.sourceRevision`, { min: 40, max: 40, pattern: COMMIT_SHA });
   const downloadUrl = assertHttpsUrl(candidate.downloadUrl, `${label}.downloadUrl`);
   const size = assertSafePositiveInteger(candidate.size, `${label}.size`, { max: 16 * 1024 * 1024 });
-  const digest = assertString(candidate.sha256, `${label}.sha256`, { min: 64, max: 64, pattern: SHA256_HEX });
+  const digest = assertString(candidate.sha256, `${label}.sha256`, { min: 64, max: 64, pattern: SHA_256_HEX });
   assertExactKeys(candidate.hostApi, ['minInclusive', 'maxExclusive'], `${label}.hostApi`);
   const minInclusive = assertSemVer(candidate.hostApi.minInclusive, `${label}.hostApi.minInclusive`);
   const maxExclusive = assertSemVer(candidate.hostApi.maxExclusive, `${label}.hostApi.maxExclusive`);
   if (compareSemVer(minInclusive, maxExclusive) >= 0) fail(`${label}.hostApi must have minInclusive < maxExclusive`);
-  const publisherKeyId = assertString(candidate.publisherKeyId, `${label}.publisherKeyId`, { min: 1, max: 64, pattern: KEY_ID });
+  const publisherKeyId = assertString(candidate.publisherKeyId, `${label}.publisherKeyId`, { min: 8, max: 128, pattern: KEY_ID });
   if (!publisherKeyIds.has(publisherKeyId)) fail(`${label}.publisherKeyId does not name a catalog publisher`);
   const result = {
     id,
@@ -218,16 +248,16 @@ const validatePackage = (candidate, index, publisherKeyIds) => {
 };
 
 const options = parseArguments(process.argv.slice(2));
-const rootKeyId = assertString(options['--key-id'], '--key-id', { min: 1, max: 64, pattern: KEY_ID });
+const rootKeyId = assertString(options['--key-id'], '--key-id', { min: 8, max: 128, pattern: KEY_ID });
 const now = parseInstant(options['--now'], '--now');
 const inputBytes = await readFile(resolve(options['--input']));
 const input = parseJsonWithUniqueKeys(inputBytes.toString('utf8'), 'catalog input');
 assertExactKeys(input, ['repositoryId', 'sequence', 'issuedAt', 'expiresAt', 'publishers', 'packages', 'revocations'], 'catalog input');
 
-const repositoryId = assertString(input.repositoryId, 'repositoryId', { min: 3, max: 128, pattern: SOURCE_ID });
+const repositoryId = assertCodePointString(input.repositoryId, 'repositoryId', { min: 3, max: 128, pattern: SOURCE_ID });
 const sequence = assertSafePositiveInteger(input.sequence, 'sequence');
-const issuedAt = assertString(input.issuedAt, 'issuedAt', { min: 20, max: 30, pattern: UTC_INSTANT });
-const expiresAt = assertString(input.expiresAt, 'expiresAt', { min: 20, max: 30, pattern: UTC_INSTANT });
+const issuedAt = assertString(input.issuedAt, 'issuedAt', { min: 20, max: 24, pattern: UTC_INSTANT });
+const expiresAt = assertString(input.expiresAt, 'expiresAt', { min: 20, max: 24, pattern: UTC_INSTANT });
 const issuedAtMillis = parseInstant(issuedAt, 'issuedAt');
 const expiresAtMillis = parseInstant(expiresAt, 'expiresAt');
 if (issuedAtMillis > now + 5 * 60 * 1000) fail('issuedAt is more than five minutes after --now');
@@ -247,8 +277,8 @@ if (new Set(packages.map((candidate) => candidate.id)).size !== packages.length)
 
 assertExactKeys(input.revocations, ['publisherFingerprints', 'packageDigests'], 'revocations');
 const revocations = {
-  publisherFingerprints: assertStringArray(input.revocations.publisherFingerprints, 'revocations.publisherFingerprints', SHA256_HEX),
-  packageDigests: assertStringArray(input.revocations.packageDigests, 'revocations.packageDigests', SHA256_HEX),
+  publisherFingerprints: assertDigestArray(input.revocations.publisherFingerprints, 'revocations.publisherFingerprints', MAX_PUBLISHERS),
+  packageDigests: assertDigestArray(input.revocations.packageDigests, 'revocations.packageDigests', MAX_PACKAGES),
 };
 
 const privateKey = readEd25519PrivateKey(await readFile(resolve(options['--private-key'])));

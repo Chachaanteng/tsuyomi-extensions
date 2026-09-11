@@ -32,9 +32,9 @@ The Host API and package contract are versioned external interfaces. This reposi
 
 ## Production packaging and repository metadata
 
-`npm run package:hxp -- --help` packages a production HXP only from explicitly supplied archive files, manifest template, and custodian-owned Ed25519 PKCS#8 key. It has no default key and rejects the deterministic fixture public key. `npm run catalog:generate -- --help` creates an offline, canonical, root-signed `tsuyomi-repository` v1 JSON file from explicit metadata/key/validation-time inputs. Neither command publishes artifacts or catalog metadata.
+`npm run package:hxp -- --help` packages a production HXP only from explicitly supplied archive files, a complete manifest template (except generated integrity), and a custodian-owned Ed25519 PKCS#8 key. It validates the completed manifest using the pinned Apache-2.0 `schemas/hxp-manifest-v1.schema.json` recorded with an exact source/blob/content hash in `EXTRACTION_PROVENANCE.md`, then applies Android's additional capability-policy semantics (origin containment, operation/method pairing, and remote parameter requirements); it has no default key and rejects the deterministic fixture public key. It also rejects files/manifest/archive sizes outside the Android verifier's 8 MiB/128 KiB/16 MiB limits and more than 256 archive entries. `npm run catalog:generate -- --help` creates an offline, canonical, root-signed `tsuyomi-repository` v1 JSON file from explicit metadata/key/validation-time inputs. Neither command publishes artifacts or catalog metadata.
 
-The catalog generator derives publisher fingerprints from raw base64 Ed25519 public keys and rejects duplicate JSON keys, unsupported fields, oversized catalogs, ambiguous identifiers, invalid revision/digest formats, and non-HTTPS credentials/fragments. See the root README for command and input examples.
+The catalog generator derives publisher fingerprints from raw base64 Ed25519 public keys and rejects duplicate JSON keys, unsupported fields, Android-incompatible SemVer values, oversized catalogs, ambiguous identifiers, invalid revision/digest formats, and raw non-HTTPS credential/fragment URI input. It canonicalizes accepted package URLs to the exact ASCII strings it signs. See the root README for command and input examples.
 
 ## Deterministic Wenku8 update fixture
 

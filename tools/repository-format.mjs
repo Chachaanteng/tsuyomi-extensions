@@ -15,6 +15,7 @@ const assertUnicodeScalarString = (value, label) => {
   for (let index = 0; index < value.length; index += 1) {
     const code = value.charCodeAt(index);
     if (code >= 0xd800 && code <= 0xdbff) {
+      if (index + 1 >= value.length) fail(`${label} contains an unpaired high surrogate`);
       const next = value.charCodeAt(index + 1);
       if (next < 0xdc00 || next > 0xdfff) fail(`${label} contains an unpaired high surrogate`);
       index += 1;
@@ -210,6 +211,15 @@ export const assertString = (value, label, { min = 1, max = 1024, pattern = unde
   if (pattern !== undefined && !pattern.test(value)) fail(`${label} is invalid`);
   return value;
 };
+export const assertCodePointString = (value, label, { min = 1, max = 1024, pattern = undefined } = {}) => {
+  if (typeof value !== 'string') fail(`${label} must be a string`);
+  assertUnicodeScalarString(value, label);
+  const count = [...value].length;
+  if (count < min || count > max) fail(`${label} must be ${min}..${max} Unicode code points`);
+  if (pattern !== undefined && !pattern.test(value)) fail(`${label} is invalid`);
+  return value;
+};
+
 
 export const assertSafePositiveInteger = (value, label, { max = Number.MAX_SAFE_INTEGER } = {}) => {
   if (!Number.isSafeInteger(value) || value < 1 || value > max) fail(`${label} must be a positive safe JSON integer`);
@@ -248,8 +258,9 @@ export const ed25519PublicKeyBytes = (privateKey) => {
 };
 
 export const assertArchivePath = (value, label = 'archive path') => {
-  assertString(value, label, { min: 1, max: 240 });
-  if (value.includes('\\') || value.startsWith('/') || value.split('/').some((part) => part === '' || part === '.' || part === '..')) {
+  if (typeof value !== 'string') fail(`${label} must be a string`);
+  assertUnicodeScalarString(value, label);
+  if (value.length > 1024 || value.trim() === '' || value.normalize('NFC') !== value || value.includes('\\') || value.startsWith('/') || value.split('/').some((part) => part === '' || part === '.' || part === '..')) {
     fail(`${label} must be a normalized relative slash path`);
   }
   return value;
@@ -302,8 +313,8 @@ export const zipStore = (entries) => {
     central.writeUInt16LE(0x0314, 4);
     central.writeUInt16LE(20, 6);
     central.writeUInt16LE(0, 8);
-    central.writeUInt16LE(0, 10);
-    central.writeUInt16LE(0x21, 12);
+    central.writeUInt16LE(0, 12);
+    central.writeUInt16LE(0x21, 14);
     central.writeUInt32LE(crc, 16);
     central.writeUInt32LE(content.length, 20);
     central.writeUInt32LE(content.length, 24);
