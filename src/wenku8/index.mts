@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Tsuyomi Contributors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 const SOURCE_ID = 'org.tsuyomi.wenku8';
 const ORIGIN = 'https://www.wenku8.net';

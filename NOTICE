@@ -1,0 +1,10 @@
+Tsuyomi Extensions
+Copyright 2026 Tsuyomi Contributors
+
+This repository contains an AGPL-3.0-only derivative extension implementation.
+It was extracted with its filtered Git history from the Apache-2.0
+`tsuyomi-extensions/` subtree of Xfire233/Tsuyomi at checkpoint
+09e0cb7326b0310495083bc8eaf8b3a7e89e1420. Historical Apache-2.0 notices and
+the license text are retained in THIRD_PARTY_NOTICES.md,
+EXTRACTION_PROVENANCE.md, and LICENSES/Apache-2.0.txt. Those prior Apache
+permissions are not revoked by the current project-wide AGPL-3.0-only license.

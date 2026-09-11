@@ -1,9 +1,14 @@
 <!-- SPDX-FileCopyrightText: 2026 Tsuyomi Contributors -->
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 
 # Changelog
 
 ## [Unreleased]
+
+### Added
+
+- Extracted the extension subtree into its independent filtered-history repository at monorepo checkpoint `09e0cb7`; the new collective derivative scope is AGPL-3.0-only while historical Apache-2.0 grants and notices remain preserved.
+- Added standalone CI, deterministic explicit-key production HXP packaging, and offline signed `tsuyomi-repository` v1 catalog generation. Neither tool creates keys, publishes artifacts, or accepts the public deterministic fixture key.
 
 ### Changed
 

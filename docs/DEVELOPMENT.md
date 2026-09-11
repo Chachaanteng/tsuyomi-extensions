@@ -1,5 +1,5 @@
 <!-- SPDX-FileCopyrightText: 2026 Tsuyomi Contributors -->
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 
 # Extension development contract
 
@@ -28,7 +28,13 @@ signature authenticates the manifest and its integrity map.
 6. Extensions receive no device model, display-profile, panel-refresh, Compose, or Android rendering API. Their results must be presentation-neutral and must not require animation, color-only meaning, infinite scroll, pull-to-refresh, or a swipe-only action.
 7. Test against sanitized fixtures. Do not commit credentials, raw session data, copyrighted chapter payloads, or live-site test dependencies.
 
-The normative transport boundary is [`tsuyomi-protocol/docs/hxp-host-api-v1.md`](../../tsuyomi-protocol/docs/hxp-host-api-v1.md); package integrity and update trust rules are in [`tsuyomi-protocol/docs/hxp-package-v1.md`](../../tsuyomi-protocol/docs/hxp-package-v1.md).
+The Host API and package contract are versioned external interfaces. This repository encodes each extension's compatible Host API range but deliberately has no relative-path dependency on a host or protocol checkout; consumers must bind a reviewed protocol revision independently.
+
+## Production packaging and repository metadata
+
+`npm run package:hxp -- --help` packages a production HXP only from explicitly supplied archive files, manifest template, and custodian-owned Ed25519 PKCS#8 key. It has no default key and rejects the deterministic fixture public key. `npm run catalog:generate -- --help` creates an offline, canonical, root-signed `tsuyomi-repository` v1 JSON file from explicit metadata/key/validation-time inputs. Neither command publishes artifacts or catalog metadata.
+
+The catalog generator derives publisher fingerprints from raw base64 Ed25519 public keys and rejects duplicate JSON keys, unsupported fields, oversized catalogs, ambiguous identifiers, invalid revision/digest formats, and non-HTTPS credentials/fragments. See the root README for command and input examples.
 
 ## Deterministic Wenku8 update fixture
 
