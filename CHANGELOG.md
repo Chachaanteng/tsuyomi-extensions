@@ -13,6 +13,8 @@
 
 ### Changed
 
+- Fixed the live GitHub source-archive download returning HTTP415: archive endpoints negotiate the GitHub API media type while the response remains binary. Release-asset downloads retain their octet-stream media type; a local HTTP regression covers the distinction.
+
 - Wenku8 推荐 now parses the source homepage into its source-ordered seasonal, new-book, and member-recommendation sections instead of substituting recommendation-metric toplists; its parsed “这本轻小说真厉害！” year link opens a typed read-only feature destination with separate 文库部门 and 单行本部门 sections. 分类 / 排行 / 完结 and bounded Tag filtering remain available.
 - Wenku8 Detail emits a validated optional ISO source update date, and author search uses exact bounded GB18030 transport. Remote target discovery now has a separate signed request; ADD/REMOVE/MOVE parsers bind success to the exact book/target and reject ambiguous or fabricated evidence.
 - The historical Apache development fixture at extraction was version `0.2.30`, SHA-256 `36db147337636ddc1b5bb00a979e42bb82e97f419ab374c6a5cb62ce852d6af6`; the independently regenerated AGPL development fixture has its own generated digest. Signed update-check capability requires Host API compatibility `[1.2.0, 2.0.0)`.

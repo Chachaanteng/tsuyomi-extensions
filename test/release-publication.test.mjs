@@ -5,13 +5,14 @@ import assert from 'node:assert/strict';
 import { execFile as execFileCallback } from 'node:child_process';
 import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import test from 'node:test';
 import { ed25519PublicKeyBytes, sha256 } from '../tools/repository-format.mjs';
-import { parseReleaseBundle, publishRepository, validateAuthenticatedCatalog } from '../tools/publish-repository.mjs';
+import { createGitHubApi, parseReleaseBundle, publishRepository, validateAuthenticatedCatalog } from '../tools/publish-repository.mjs';
 
 const sourceRevision = '1'.repeat(40);
 const initialNow = '2026-09-11T00:00:00.000Z';
@@ -410,4 +411,28 @@ test('a private-API download cannot substitute for a matching public release dow
   api.downloadPublicReleaseAsset = async () => Buffer.from('different public bytes');
   await assert.rejects(publishRepository(options(api, keys)), /public asset.*bytes/);
   assert.equal(await api.catalogBytes(), null);
+});
+
+test('GitHub source archives negotiate API media type and return binary bytes', async (t) => {
+  const archive = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xfe]);
+  const server = createServer((request, response) => {
+    if (request.headers.accept !== 'application/vnd.github+json') {
+      response.writeHead(415);
+      response.end('Unsupported Media Type');
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': 'application/gzip' });
+    response.end(archive);
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  });
+  const api = createGitHubApi({
+    repository: defaultRepository,
+    token: 'nonproduction-test-token',
+    fetchImpl: (url, init) => fetch(`http://127.0.0.1:${server.address().port}${url.pathname}`, init),
+  });
+  assert.deepEqual(await api.getSourceArchive(sourceRevision), archive);
 });

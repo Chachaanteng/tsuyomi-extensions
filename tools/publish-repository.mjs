@@ -818,7 +818,7 @@ export const createGitHubRestApi = ({ token, repository, fetchImpl = globalThis.
       return { id: response?.id, name: response?.name, size: response?.size };
     },
     async getSourceArchive(sourceRevision) {
-      return request('GET', rest(`tarball/${pathSegment(sourceRevision)}`), { binary: true });
+      return request('GET', rest(`tarball/${pathSegment(sourceRevision)}`), { binary: true, headers: { Accept: 'application/vnd.github+json' } });
     },
   };
 };

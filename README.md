@@ -149,8 +149,13 @@ Before enabling it, an explicitly authorized custodian must:
 2. Create environment `official-distribution`, restrict deployment to exactly
    `main`, and restrict changes to the environment, workflow and repository
    settings. Routine publication does not add a second required-reviewer gate.
-   Protect the catalog branch from other writers/force-push/deletion and release
-   tags/assets from replacement while permitting this publication workflow.
+   Restrict repository write access to authorized maintainers, forbid catalog
+   force-push/deletion and release-tag replacement, and retain signed-catalog
+   verification as the client trust boundary. GitHub rejects its built-in Actions
+   integration as an update-ruleset bypass actor unless it is an eligible
+   installed app in the ruleset owner; the default GITHUB_TOKEN deployment cannot
+   claim an exclusive-bot writer rule. That stronger isolation needs a separately
+   installed least-privilege GitHub App, not a broad personal access token.
 3. Set `RELEASE_TOOL_REVISION` to the full 40-hex commit of the reviewed signing
    tools. Signing never follows a mutable branch or tag. This revision must
    contain the publication tool and its validated lockfile.
