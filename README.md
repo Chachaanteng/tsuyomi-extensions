@@ -141,11 +141,11 @@ The workflow is disabled unless repository variable
 provision keys, configure GitHub protections or authorize a first publication.
 Before enabling it, an explicitly authorized custodian must:
 
-1. Protect `main` with required successful contributor CI, pull-request review
-   and code-owner review; restrict bypass/direct pushes. Review `CODEOWNERS`
-   against the actual maintainer roster. A sole maintainer cannot approve their
-   own PR under GitHub's review rules; arrange a legitimate review author/owner
-   flow rather than disabling the boundary silently.
+1. Protect `main` with required pull requests and strict successful contributor
+   CI, including administrators; prohibit direct/force pushes and deletion.
+   The authorized single-maintainer policy uses zero formal approving reviews
+   and no mandatory CODEOWNER approval. CODEOWNERS remains ownership metadata;
+   the maintainer explicitly merges reviewed changes, never automatic merge.
 2. Create environment `official-distribution`, restrict deployment to exactly
    `main`, and restrict changes to the environment, workflow and repository
    settings. Routine publication does not add a second required-reviewer gate.
