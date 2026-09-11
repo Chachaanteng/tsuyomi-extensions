@@ -10,6 +10,7 @@
 - Extracted the extension subtree into its independent filtered-history repository at monorepo checkpoint `09e0cb7`; the new collective derivative scope is AGPL-3.0-only while historical Apache-2.0 grants and notices remain preserved.
 - Added standalone CI, deterministic explicit-key production HXP packaging, and offline signed `tsuyomi-repository` v1 catalog generation. Neither tool creates keys, publishes artifacts, or accepts the public deterministic fixture key.
 - Added an activation-gated automated distribution workflow: data-only contributor build inputs, separately pinned protected signing tools, immutable GitHub Release assets, exact-commit corresponding source, authenticated catalog renewal and failed-run issue notification. Production secrets and first publication are not provisioned by this change.
+- Activated the protected official catalog and published Wenku8 `0.2.31` with an immutable signed HXP and matching source archive. Routine reviewed release changes now publish through the protected workflow; clients still require explicit installation approval.
 
 ### Changed
 

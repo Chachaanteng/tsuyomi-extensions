@@ -99,8 +99,7 @@ corresponding source archive are GitHub Release attachments, not generated
 commits in `main`. Tags use `<source-id>-v<version>` and packages use
 `<source-id>-<version>.hxp`. The `repository` branch owns `index-v1.json` at
 `https://raw.githubusercontent.com/Chachaanteng/tsuyomi-extensions/repository/index-v1.json`.
-This is the intended endpoint, not a claim that production distribution is live.
-The host reads that signed index, never GitHub's latest-release listing.
+Production distribution is active with the root-signed catalog and versioned release assets; the host reads that signed index, never GitHub's latest-release listing.
 
 The release workflow builds and tests without production keys, uploads a
 data-only input bundle, then starts a clean signing runner. That runner checks
