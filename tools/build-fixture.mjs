@@ -28,7 +28,7 @@ const manifest = {
   format: 'tsuyomi-hxp',
   manifestVersion: 1,
   id: 'org.tsuyomi.wenku8',
-  version: '0.2.34',
+  version: '0.2.35',
   display: {
     name: 'Wenku8',
     summary: 'Wenku8 阅读与显式远程收藏来源（测试发布者）',
@@ -53,6 +53,7 @@ const manifest = {
       origin: 'https://www.wenku8.net',
       method: 'GET',
       path: '/modules/article/reader.php',
+      referrerPath: '/index.php',
       parameters: { aid: { kind: 'remoteBookId' } },
     },
     remoteLibrary: {

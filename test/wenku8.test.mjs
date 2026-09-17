@@ -179,6 +179,7 @@ test('update-check-v2 uses its signed read-only directory request and emits no r
     headers: { Accept: 'text/html,application/xhtml+xml' },
     decode: 'gb18030',
     cache: 'network-only',
+    referrerUrl: 'https://www.wenku8.net/index.php',
   });
   const baseline = parseUpdateCheckV2(await fixture('directory'), '1234');
   assert.equal(baseline.complete, true);

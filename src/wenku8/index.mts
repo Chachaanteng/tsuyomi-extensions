@@ -793,6 +793,7 @@ export const parseDirectory = (html: string, remoteBookId: string) => {
   return { sourceId: SOURCE_ID, remoteBookId, chapters };
 };
 
+const UPDATE_CHECK_REFERRER_PATH = '/index.php';
 export const buildUpdateCheckV2Request = (remoteBookId: string): NetworkRequest => {
   if (!/^\d{1,12}$/.test(remoteBookId)) throw new Error('INVALID_BOOK_ID');
   return {
@@ -803,6 +804,9 @@ export const buildUpdateCheckV2Request = (remoteBookId: string): NetworkRequest 
     headers: { Accept: 'text/html,application/xhtml+xml' },
     decode: 'gb18030',
     cache: 'network-only',
+    // The site's Cloudflare rule answers a reader.php request that names no referrer with a managed
+    // challenge. The signed policy admits one fixed same-origin referrer, so the site index is named.
+    referrerUrl: `${ORIGIN}${UPDATE_CHECK_REFERRER_PATH}`,
   };
 };
 
