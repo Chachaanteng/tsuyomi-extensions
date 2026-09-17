@@ -8,6 +8,7 @@
 - Do not automate CAPTCHA, Cloudflare, or anti-bot verification. The host may only let the user complete these flows in a controlled WebView.
 - Use sanitized fixtures, never credentials, cookies, copyrighted chapter payloads, or live-site CI dependencies.
 - Record every third-party adoption in `THIRD_PARTY_NOTICES.md`.
+- Keep attribution human. GitHub counts every `Co-authored-by:` trailer as a contributor, and a machine account added there can only be removed by rewriting published history, so `verify` rejects a trailer that credits an automated agent. Omit the trailer instead of relying on a later cleanup.
 - Use SemVer and update `CHANGELOG.md`; every package/tool change records the compatible protocol version and deterministic artifact digest.
 - Dependency changes must update lock state, `THIRD_PARTY_NOTICES.md`, REUSE metadata, and package verification evidence together.
 - Bind each package to an explicit reviewed Host API/protocol revision; never test against an unpinned sibling checkout or `latest` contract.
