@@ -303,7 +303,7 @@ test('mixed chapter preserves prose and illustration order', () => {
   assert.deepEqual(document.blocks.map((block) => block.kind), ['paragraph', 'image', 'paragraph']);
 });
 
-test('request builders use live Wenku8 routes without admitting raw pages to durable cache', () => {
+test('request builders use live Wenku8 routes and admit cacheable reads while keeping update checks and remote-library mutations network-only', () => {
   const search = buildSearchRequest('文学少女', 1);
   assert.equal(search.url, 'https://www.wenku8.net/modules/article/search.php');
   assert.deepEqual(search.query, [
@@ -313,7 +313,7 @@ test('request builders use live Wenku8 routes without admitting raw pages to dur
   ]);
   assert.equal(search.queryEncoding, 'gb18030');
   assert.equal(search.decode, 'gb18030');
-  assert.equal(search.cache, 'network-only');
+  assert.equal(search.cache, 'default');
   const author = buildAuthorSearchRequest('林川', 1);
   assert.deepEqual(author.query, [
     { name: 'searchtype', value: 'author' },
@@ -327,7 +327,7 @@ test('request builders use live Wenku8 routes without admitting raw pages to dur
   assert.equal(buildDirectoryRequest('1234').url, 'https://www.wenku8.net/modules/article/reader.php?aid=1234');
   assert.equal(
     buildChapterRequest('/modules/article/reader.php?aid=1234&cid=10001', '1234', '10001').cache,
-    'network-only',
+    'default',
   );
   assert.throws(() => buildChapterRequest('https://outside.example/10001.htm', '1234', '10001'), /ORIGIN_NOT_GRANTED/);
   assert.throws(
@@ -342,7 +342,7 @@ test('source Home exposes source-ordered homepage recommendations, category tags
     method: 'GET',
     headers: { Accept: 'text/html,application/xhtml+xml' },
     decode: 'gb18030',
-    cache: 'network-only',
+    cache: 'default',
     referrerUrl: 'https://www.wenku8.net/',
   });
   assert.deepEqual(buildHomeRequest(null, { view: 'category', tag: 'fantasy', sort: '2' }), {
@@ -356,7 +356,7 @@ test('source Home exposes source-ordered homepage recommendations, category tags
     method: 'GET',
     headers: { Accept: 'text/html,application/xhtml+xml' },
     decode: 'gb18030',
-    cache: 'network-only',
+    cache: 'default',
     referrerUrl: 'https://www.wenku8.net/',
   });
   assert.deepEqual(buildHomeRequest(null, { view: 'recommend', feature: 'sugoi-2026' }), {
@@ -364,7 +364,7 @@ test('source Home exposes source-ordered homepage recommendations, category tags
     method: 'GET',
     headers: { Accept: 'text/html,application/xhtml+xml' },
     decode: 'gb18030',
-    cache: 'network-only',
+    cache: 'default',
     referrerUrl: 'https://www.wenku8.net/',
   });
 
