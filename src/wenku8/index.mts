@@ -420,7 +420,7 @@ const buildSearchRequestForType = (
     method: 'GET',
     headers: { Accept: 'text/html,application/xhtml+xml' },
     decode: 'gb18030',
-    cache: 'network-only',
+    cache: 'default',
   };
 };
 export const buildSearchRequest = (query: string, page = 1): NetworkRequest =>
@@ -631,7 +631,7 @@ export const buildHomeRequest = (
     method: 'GET' as const,
     headers: { Accept: 'text/html,application/xhtml+xml' },
     decode: 'gb18030' as const,
-    cache: 'network-only' as const,
+    cache: 'default' as const,
     referrerUrl: `${ORIGIN}/`,
   };
   if (selection.view === 'recommend') {
@@ -769,7 +769,7 @@ export const buildDetailRequest = (remoteBookId: string): NetworkRequest => {
     method: 'GET',
     headers: { Accept: 'text/html,application/xhtml+xml' },
     decode: 'gb18030',
-    cache: 'network-only',
+    cache: 'default',
     referrerUrl: `${ORIGIN}/`,
   };
 };
@@ -813,7 +813,7 @@ export const buildDirectoryRequest = (remoteBookId: string): NetworkRequest => {
     method: 'GET',
     headers: { Accept: 'text/html,application/xhtml+xml' },
     decode: 'gb18030',
-    cache: 'network-only',
+    cache: 'default',
     referrerUrl: `${ORIGIN}/book/${remoteBookId}.htm`,
   };
 };
@@ -895,7 +895,7 @@ export const buildChapterRequest = (url: string, remoteBookId: string, chapterId
     method: 'GET',
     headers: { Accept: 'text/html,application/xhtml+xml' },
     decode: 'gb18030',
-    cache: 'network-only',
+    cache: 'default',
     referrerUrl: `${ORIGIN}/modules/article/reader.php?aid=${remoteBookId}`,
   };
 };
