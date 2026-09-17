@@ -406,7 +406,7 @@ const buildSearchRequestForType = (
   page = 1,
 ): NetworkRequest => {
   const normalized = query.trim();
-  if (!normalized || normalized.length > 100 || !Number.isInteger(page) || page < 1 || page > 100) {
+  if (!normalized || normalized.length > 100 || !Number.isInteger(page) || page < 1) {
     throw new Error('INVALID_SEARCH_INPUT');
   }
   return {
@@ -566,10 +566,60 @@ const normalizeHomeSelection = (selectedFilters: HomeFilterSelection) => {
   };
 };
 
+/**
+ * The site's own page ceiling, read from the document it served.
+ *
+ * Hikari's `Parser.getMaxNum` is the reference: the largest page number the served pager exposes
+ * wins. Candidates stay page-scoped so the result can never exceed the site's real last page — a
+ * ceiling that overshot would make the next request land on a page that does not exist, and the host
+ * contract cannot express an empty terminal page. A document that exposes no pager leaves the
+ * ceiling unknown, and the caller falls back to the page's own next-page link.
+ */
+const SITE_PAGE_CANDIDATES: ReadonlyArray<readonly [RegExp, RegExp | null]> = [
+  [/<a\b[^>]*\bhref=["']?([^"'>\s]*)/gi, /page=/i],
+  [/<option\b[^>]*\bvalue=["']?([^"'>\s]*)/gi, /page=/i],
+  [/<input\b[^>]*\bvalue=["']?([^"'>\s]*)/gi, /page/i],
+];
+
+const PAGE_NUMBER = /(?:page=|[^\d])(\d{1,5})(?=[^\d]|$)/gi;
+
+const sitePageCeiling = (html: string): number | null => {
+  const candidates: string[] = [];
+  for (const [pattern, scope] of SITE_PAGE_CANDIDATES) {
+    for (const match of html.matchAll(pattern)) {
+      const attributes = match[0] ?? '';
+      const value = match[1] ?? '';
+      if (scope === null || scope.test(attributes)) candidates.push(value);
+    }
+  }
+  for (const match of html.matchAll(/<a\b[^>]*class=["'][^"']*\blast\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    candidates.push(stripTags(match[1] ?? ''));
+  }
+  let ceiling: number | null = null;
+  for (const candidate of candidates) {
+    for (const match of ` ${candidate} `.matchAll(PAGE_NUMBER)) {
+      const value = Number.parseInt(match[1] ?? '', 10);
+      if (Number.isInteger(value) && value >= 1 && (ceiling === null || value > ceiling)) ceiling = value;
+    }
+  }
+  return ceiling;
+};
+
 const homePageFromCursor = (cursor: string | null): number => {
-  const page = cursor === null ? 1 : Number.parseInt(/^page-(\d{1,3})$/.exec(cursor)?.[1] ?? '', 10);
-  if (!Number.isInteger(page) || page < 1 || page > 999) throw new Error('INVALID_HOME_CURSOR');
+  const page = cursor === null ? 1 : Number.parseInt(/^page-(\d{1,5})$/.exec(cursor)?.[1] ?? '', 10);
+  if (!Number.isInteger(page) || page < 1) throw new Error('INVALID_HOME_CURSOR');
   return page;
+};
+
+/**
+ * Remote favourites start at page 1 without a cursor, so a cursor names page 2 or later. The page
+ * number itself is as wide as the site's own pager, not a fixed ceiling; the previous grammar
+ * (`[2-9][0-9]{0,2}`) also rejected page 10-19, 100-199 and so on.
+ */
+const requireRemoteCursor = (cursor: string | null): void => {
+  if (cursor === null) return;
+  const page = Number.parseInt(/^page-(\d{1,5})$/.exec(cursor)?.[1] ?? '', 10);
+  if (!Number.isInteger(page) || page < 2) throw new Error('INVALID_REMOTE_CURSOR');
 };
 
 export const buildHomeRequest = (
@@ -662,10 +712,17 @@ export const parseHome = (
   const currentPage = homePageFromCursor(cursor);
   const parsed = parseSearch(html);
   if (!parsed.items.length) throw new Error('EMPTY_SOURCE_RESPONSE');
-  const pageMatches = [...html.matchAll(/[?&](?:amp;)?page=(\d{1,3})/gi)]
+  const ceiling = sitePageCeiling(html);
+  const pageMatches = [...html.matchAll(/[?&](?:amp;)?page=(\d{1,5})/gi)]
     .map((match) => Number.parseInt(match[1] ?? '', 10))
     .filter((page) => Number.isInteger(page) && page > currentPage);
-  const nextPage = pageMatches.length ? Math.min(...pageMatches) : null;
+  const nextPage = ceiling !== null && currentPage >= ceiling
+    ? null
+    : pageMatches.length
+      ? Math.min(...pageMatches)
+      : ceiling === null
+        ? null
+        : currentPage + 1;
   let sectionTitle: string;
   if (selection.view === 'category') {
     filters.push(
@@ -899,7 +956,7 @@ export const parseChapter = (html: string, remoteBookId: string, chapterId: stri
 };
 
 export const buildRemoteLibraryRequest = (cursor: string | null): NetworkRequest => {
-  if (cursor !== null && !/^page-[2-9][0-9]{0,2}$/.test(cursor)) throw new Error('INVALID_REMOTE_CURSOR');
+  requireRemoteCursor(cursor);
   const suffix = cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`;
   return {
     url: `${ORIGIN}/modules/article/bookcase.php?action=list${suffix}`,
@@ -934,7 +991,7 @@ export const parseRemoteLibrary = (html: string): { items: BookSummary[]; nextCu
   });
   const parsedItems = items.length > 0 ? items : parseSearch(html).items;
   const cursor = /data-next-cursor=["']([^"']+)["']/i.exec(html)?.[1] ?? null;
-  if (cursor !== null && !/^page-[2-9][0-9]{0,2}$/.test(cursor)) throw new Error('INVALID_REMOTE_CURSOR');
+  requireRemoteCursor(cursor);
   const complete = /data-complete=["']true["']/i.test(html) || cursor === null;
   return { items: parsedItems, nextCursor: cursor, complete };
 };
