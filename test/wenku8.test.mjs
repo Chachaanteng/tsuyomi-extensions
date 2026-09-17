@@ -438,6 +438,16 @@ test('login and challenge fixtures become typed remediation states', async () =>
   assert.equal(classifyPage(await fixture('search')), 'ok');
 });
 
+test('Cloudflare passive bot-scoring loader inside a served page is not a challenge', async () => {
+  const passive = `<script>(function(){var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);})();</script>`;
+  const detail = `${await fixture('detail')}${passive}`;
+  assert.equal(classifyPage(detail, 'https://www.wenku8.net/book/1234.htm', 'detail', '1234'), 'ok');
+  assert.equal(classifyPage(detail, 'https://www.wenku8.net/book/1234.htm'), 'ok');
+  assert.equal(classifyPage(`${await fixture('directory')}${passive}`, 'https://www.wenku8.net/modules/article/reader.php?aid=1234', 'directory', '1234'), 'ok');
+  assert.equal(classifyPage(`${passive}${await fixture('challenge')}`), 'verification-required');
+  assert.equal(classifyPage(`${passive}${await fixture('login')}`), 'session-required');
+});
+
 test('operation-specific admission rejects wrong Wenku8 page shapes and identities', async () => {
   const search = await fixture('search');
   const detail = await fixture('detail');
