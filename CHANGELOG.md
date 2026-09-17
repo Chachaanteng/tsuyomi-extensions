@@ -11,6 +11,7 @@
 - Added standalone CI, deterministic explicit-key production HXP packaging, and offline signed `tsuyomi-repository` v1 catalog generation. Neither tool creates keys, publishes artifacts, or accepts the public deterministic fixture key.
 - Added an activation-gated automated distribution workflow: data-only contributor build inputs, separately pinned protected signing tools, immutable GitHub Release assets, exact-commit corresponding source, authenticated catalog renewal and failed-run issue notification. Production secrets and first publication are not provisioned by this change.
 - Activated the protected official catalog and published Wenku8 `0.2.31` with an immutable signed HXP and matching source archive. Routine reviewed release changes now publish through the protected workflow; clients still require explicit installation approval.
+- Added a `verify` gate that rejects a `Co-authored-by:` trailer crediting an automated agent. GitHub counts every such trailer as a contributor and only a rewrite of published history can remove one, so the pushed range is inspected before the trailer can reach `main`. No package, manifest or signing contract changes.
 
 ### Changed
 

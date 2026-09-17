@@ -18,10 +18,15 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 20.18.0
           cache: npm
+      - name: Reject automated co-author attribution
+        env:
+          BASE_REVISION: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node tools/check-commit-messages.mjs "$BASE_REVISION" "${{ github.sha }}"
       - run: npm ci
       - run: npm test
       - name: Generate the test fixture deterministically
