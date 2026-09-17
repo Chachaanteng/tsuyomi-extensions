@@ -151,11 +151,14 @@ const absoluteUrl = (value: string, base = `${ORIGIN}/`): string => {
   const directory = base.slice(0, base.lastIndexOf('/') + 1);
   return `${directory}${trimmed}`;
 };
+const MEDIA_ORIGIN = 'https://img.wenku8.com';
+const LEGACY_MEDIA_PATH = /^(?:https?:\/\/pic\.wenku8\.com)?(?:\/files\/article)?(\/image\/.+)$/i;
 const absoluteMediaUrl = (value: string, base: string): string => {
   const trimmed = value.trim();
-  if (trimmed.startsWith('/files/article/image/')) return `https://pic.wenku8.com${trimmed}`;
-  if (trimmed.startsWith('/')) return `https://img.wenku8.com${trimmed}`;
+  const legacy = LEGACY_MEDIA_PATH.exec(trimmed);
+  if (legacy?.[1]) return `${MEDIA_ORIGIN}${legacy[1]}`;
   if (/^https?:\/\//i.test(trimmed)) return trimmed.replace(/^http:\/\//i, 'https://');
+  if (trimmed.startsWith('/')) return `${MEDIA_ORIGIN}${trimmed}`;
   return absoluteUrl(trimmed, base);
 };
 
@@ -239,7 +242,7 @@ const admittedIllustration = (attributes: string, base: string): { url: string; 
   const src = attribute(attributes, 'src');
   if (!src) return null;
   const url = absoluteMediaUrl(src, base);
-  if (!/^https:\/\/(?:img\.wenku8\.com|pic\.wenku8\.com|pic\.777743\.xyz)\//i.test(url)) return null;
+  if (!/^https:\/\/(?:img\.wenku8\.com|pic\.777743\.xyz)\//i.test(url)) return null;
   const classNames = attribute(attributes, 'class')?.split(/\s+/u).filter(Boolean) ?? [];
   if (classNames.some((name) => /^(?:logo|icon|avatar|advert|banner)$/i.test(name))) return null;
   const parseDimension = (name: string): number | null => {
@@ -457,7 +460,9 @@ export const parseSearch = (
     const cover = image ? attribute(image[1] ?? '', 'src') : null;
     const aid = identity.remoteBookId;
     const dir = Math.floor(parseInt(aid, 10) / 1000);
-    const derivedCover = !isNaN(dir) ? `${ORIGIN}/files/article/image/${dir}/${aid}/${aid}s.jpg` : null;
+    const derivedCover = !isNaN(dir)
+      ? absoluteMediaUrl(`/image/${dir}/${aid}/${aid}s.jpg`, identity.canonicalUrl)
+      : null;
     items.push({
       sourceId: SOURCE_ID,
       remoteBookId: identity.remoteBookId,
