@@ -14,6 +14,8 @@
 
 ### Changed
 
+- Fixed live Wenku8 detail and directory pages being classified `verification-required` once the site began injecting Cloudflare's passive bot-scoring loader (`/cdn-cgi/challenge-platform/scripts/jsd/main.js`) into fully served pages. The loader reference is removed before the challenge markers are matched; interstitial challenge pages, login pages and the existing challenge fixtures still classify as before. This is an unreleased source correction, not a signed-artifact replacement.
+
 - Corrected Wenku8 covers so every scraped and derived media URL resolves to the live `https://img.wenku8.com/image/{group}/{book}/{book}s.jpg` picture host: the dead `pic.wenku8.com` legacy rewrite (relative or absolute `/files/article/image/...`) now normalizes onto the image host, and image-free website-collection rows derive their cover through the same resolver. The unreachable `pic.wenku8.com` origin was removed from the network manifest and the illustration allowlist; the external `pic.777743.xyz` illustration host is retained because the live site still serves chapter images from it. Host API compatibility remains `[1.2.0, 2.0.0)`. This is an unreleased source correction, not a signed-artifact replacement.
 
 - Fixed the live GitHub source-archive download returning HTTP415: archive endpoints negotiate the GitHub API media type while the response remains binary. Release-asset downloads retain their octet-stream media type; a local HTTP regression covers the distinction.

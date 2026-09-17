@@ -28,7 +28,7 @@ const manifest = {
   format: 'tsuyomi-hxp',
   manifestVersion: 1,
   id: 'org.tsuyomi.wenku8',
-  version: '0.2.33',
+  version: '0.2.34',
   display: {
     name: 'Wenku8',
     summary: 'Wenku8 阅读与显式远程收藏来源（测试发布者）',

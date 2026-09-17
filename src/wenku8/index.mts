@@ -288,9 +288,16 @@ const readerIdentityFromUrl = (value: string | undefined): { remoteBookId: strin
   return staticMatch ? { remoteBookId: staticMatch[1] ?? '', chapterId: staticMatch[2] ?? null } : null;
 };
 
+/**
+ * Cloudflare's passive bot-scoring loader (`/cdn-cgi/challenge-platform/scripts/jsd/…`) is injected
+ * into ordinary pages the site served in full; only an interstitial that replaced the page is a
+ * challenge. The passive reference is removed before the challenge markers are looked for, so a
+ * complete detail page that merely carries it stays admissible.
+ */
+const PASSIVE_CLOUDFLARE_SCRIPT = /\/cdn-cgi\/challenge-platform\/scripts\/jsd\/[^\s'"<>]*/gi;
 const sessionRemediation = (html: string): 'session-required' | 'verification-required' | null => {
   if (/欢迎您/i.test(html) && /(?:退出登录|logout(?:\.php)?)/i.test(html)) return null;
-  if (/(?:captcha|cf-chl-|challenge-platform|人机验证|安全验证|验证码)/i.test(html)) {
+  if (/(?:captcha|cf-chl-|challenge-platform|人机验证|安全验证|验证码)/i.test(html.replace(PASSIVE_CLOUDFLARE_SCRIPT, ''))) {
     return 'verification-required';
   }
   if (/<form\b[^>]*(?:login|signin)|(?:用户登录|会员登录|请先登录|登录后继续)/i.test(html)) {
