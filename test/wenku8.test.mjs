@@ -418,6 +418,54 @@ test('source Home exposes source-ordered homepage recommendations, category tags
   assert.throws(() => buildHomeRequest(null, { view: 'recommend', feature: 'outside' }), /INVALID_HOME_FILTER/);
 });
 
+test('Home pagination bounds itself by the page ceiling the site declares', () => {
+  const catalog = (pager) => `<html><body><main>
+    <div class="book-card">
+      <a href="/book/1234.htm"><img src="/files/article/image/12/1234/1234s.jpg" alt=""><span>雾港纪事</span></a>
+      <p>小说作者：林川</p>
+    </div>
+  </main>${pager}</body></html>`;
+  const selection = { view: 'completed' };
+
+  const linked = parseHome(
+    catalog('<nav><a href="/modules/article/toplist.php?sort=fullflag&amp;page=4">下一页</a></nav>'),
+    null,
+    selection,
+  );
+  assert.equal(linked.nextCursor, 'page-4');
+  assert.equal(linked.complete, false);
+
+  const pagerWithoutNextLink = '<nav><select><option value="page=12">12</option></select></nav>';
+  const belowCeiling = parseHome(catalog(pagerWithoutNextLink), 'page-5', selection);
+  assert.equal(belowCeiling.nextCursor, 'page-6');
+  assert.equal(belowCeiling.complete, false);
+
+  const atCeiling = parseHome(catalog(pagerWithoutNextLink), 'page-12', selection);
+  assert.equal(atCeiling.nextCursor, null);
+  assert.equal(atCeiling.complete, true);
+
+  const withoutPager = parseHome(catalog(''), 'page-3', selection);
+  assert.equal(withoutPager.nextCursor, null);
+  assert.equal(withoutPager.complete, true);
+
+  const pageOf = (cursor) =>
+    buildHomeRequest(cursor, selection).query?.find((entry) => entry.name === 'page')?.value;
+  assert.equal(pageOf('page-1'), '1');
+  assert.equal(pageOf('page-1024'), '1024');
+  assert.throws(() => buildHomeRequest('page-0', selection), /INVALID_HOME_CURSOR/);
+  assert.throws(() => buildHomeRequest('page-100000', selection), /INVALID_HOME_CURSOR/);
+
+  assert.equal(
+    buildRemoteLibraryRequest('page-10').url,
+    'https://www.wenku8.net/modules/article/bookcase.php?action=list&cursor=page-10',
+  );
+  assert.equal(
+    buildRemoteLibraryRequest('page-1024').url,
+    'https://www.wenku8.net/modules/article/bookcase.php?action=list&cursor=page-1024',
+  );
+  assert.throws(() => buildRemoteLibraryRequest('page-1'), /INVALID_REMOTE_CURSOR/);
+});
+
 test('directory accepts live reader query links and keeps exact book identity', () => {
   const directory = parseDirectory(`
     <table class="css"><tr><td class="ccss">
