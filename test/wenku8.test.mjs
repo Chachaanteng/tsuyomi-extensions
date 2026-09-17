@@ -41,7 +41,7 @@ test('search normalizes stable book identities and skips malformed cards', async
       remoteBookId: '1234',
       title: '雾港纪事',
       author: '林川',
-      coverUrl: 'https://pic.wenku8.com/files/article/image/12/1234/1234s.jpg',
+      coverUrl: 'https://img.wenku8.com/image/12/1234/1234s.jpg',
       canonicalUrl: 'https://www.wenku8.net/book/1234.htm',
     },
     {
@@ -49,11 +49,27 @@ test('search normalizes stable book identities and skips malformed cards', async
       remoteBookId: '5678',
       title: '星环邮差',
       author: '苏遥',
-      coverUrl: 'https://pic.wenku8.com/files/article/image/56/5678/5678s.jpg',
+      coverUrl: 'https://img.wenku8.com/image/56/5678/5678s.jpg',
       canonicalUrl: 'https://www.wenku8.net/book/5678.htm',
     },
   ]);
   assert.deepEqual(result.diagnostics, [{ stage: 'search-parse', safeCode: 'malformed-book-card' }]);
+});
+
+test('legacy picture-host covers and path prefixes resolve to the live image host', () => {
+  const html = `
+    <table>
+      <tr><td><a href="/book/1234.htm">甲</a></td><td><img src="/files/article/image/12/1234/1234s.jpg"></td></tr>
+      <tr><td><a href="/book/5678.htm">乙</a></td><td><img src="https://pic.wenku8.com/files/article/image/56/5678/5678s.jpg"></td></tr>
+      <tr><td><a href="/book/9012.htm">丙</a></td><td><img src="http://pic.wenku8.com/files/article/image/90/9012/9012s.jpg"></td></tr>
+      <tr><td><a href="/book/3456.htm">丁</a></td><td><img src="/image/34/3456/3456s.jpg"></td></tr>
+    </table>`;
+  assert.deepEqual(parseSearch(html).items.map((book) => book.coverUrl), [
+    'https://img.wenku8.com/image/12/1234/1234s.jpg',
+    'https://img.wenku8.com/image/56/5678/5678s.jpg',
+    'https://img.wenku8.com/image/90/9012/9012s.jpg',
+    'https://img.wenku8.com/image/34/3456/3456s.jpg',
+  ]);
 });
 
 test('search accepts a same-origin exact-match redirect to the canonical detail page', async () => {
@@ -66,7 +82,7 @@ test('search accepts a same-origin exact-match redirect to the canonical detail 
     remoteBookId: '1234',
     title: '雾港纪事',
     author: '林川',
-    coverUrl: 'https://pic.wenku8.com/files/article/image/12/1234/1234.jpg',
+    coverUrl: 'https://img.wenku8.com/image/12/1234/1234.jpg',
     canonicalUrl: 'https://www.wenku8.net/book/1234.htm',
   }]);
   assert.deepEqual(result.diagnostics, []);
@@ -487,6 +503,12 @@ test('remote favourites pagination is explicit bounded and complete', async () =
   assert.equal(second.nextCursor, null);
   assert.equal(second.items[0].remoteTargetId, '0');
   assert.throws(() => buildRemoteLibraryRequest(''), /INVALID_REMOTE_CURSOR/);
+});
+
+test('remote favourites without image tags derive covers on the admitted picture host', () => {
+  const result = parseRemoteLibrary('<table><tr><td><a href="/book/1234.htm">测试书籍</a></td></tr></table>');
+  assert.equal(result.items[0].coverUrl, 'https://img.wenku8.com/image/1/1234/1234s.jpg');
+  assert.equal(result.items[0].canonicalUrl, 'https://www.wenku8.net/book/1234.htm');
 });
 
 test('remote add uses the live idempotent endpoint and binds the exact response identity', async () => {

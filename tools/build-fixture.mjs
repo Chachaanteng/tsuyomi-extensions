@@ -28,7 +28,7 @@ const manifest = {
   format: 'tsuyomi-hxp',
   manifestVersion: 1,
   id: 'org.tsuyomi.wenku8',
-  version: '0.2.30',
+  version: '0.2.33',
   display: {
     name: 'Wenku8',
     summary: 'Wenku8 阅读与显式远程收藏来源（测试发布者）',
@@ -40,7 +40,7 @@ const manifest = {
   signing: { algorithm: 'Ed25519', keyId: 'tsuyomi-phase2-fixture', signatureFile: 'signature.ed25519' },
   capabilities: {
     network: {
-      origins: ['https://www.wenku8.net', 'https://img.wenku8.com', 'https://pic.wenku8.com', 'https://pic.777743.xyz'],
+      origins: ['https://www.wenku8.net', 'https://img.wenku8.com', 'https://pic.777743.xyz'],
       maxConcurrentRequests: 2,
       requestTimeoutMs: 15000,
       maxResponseBytes: 2097152,

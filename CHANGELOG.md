@@ -14,6 +14,8 @@
 
 ### Changed
 
+- Corrected Wenku8 covers so every scraped and derived media URL resolves to the live `https://img.wenku8.com/image/{group}/{book}/{book}s.jpg` picture host: the dead `pic.wenku8.com` legacy rewrite (relative or absolute `/files/article/image/...`) now normalizes onto the image host, and image-free website-collection rows derive their cover through the same resolver. The unreachable `pic.wenku8.com` origin was removed from the network manifest and the illustration allowlist; the external `pic.777743.xyz` illustration host is retained because the live site still serves chapter images from it. Host API compatibility remains `[1.2.0, 2.0.0)`. This is an unreleased source correction, not a signed-artifact replacement.
+
 - Fixed the live GitHub source-archive download returning HTTP415: archive endpoints negotiate the GitHub API media type while the response remains binary. Release-asset downloads retain their octet-stream media type; a local HTTP regression covers the distinction.
 
 - Wenku8 推荐 now parses the source homepage into its source-ordered seasonal, new-book, and member-recommendation sections instead of substituting recommendation-metric toplists; its parsed “这本轻小说真厉害！” year link opens a typed read-only feature destination with separate 文库部门 and 单行本部门 sections. 分类 / 排行 / 完结 and bounded Tag filtering remain available.

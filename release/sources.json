@@ -7,7 +7,7 @@
         "format": "tsuyomi-hxp",
         "manifestVersion": 1,
         "id": "org.tsuyomi.wenku8",
-        "version": "0.2.31",
+        "version": "0.2.33",
         "display": {
           "name": "Wenku8",
           "summary": "Wenku8 阅读与显式远程收藏来源",
@@ -28,7 +28,6 @@
             "origins": [
               "https://www.wenku8.net",
               "https://img.wenku8.com",
-              "https://pic.wenku8.com",
               "https://pic.777743.xyz"
             ],
             "maxConcurrentRequests": 2,
