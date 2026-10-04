@@ -102,6 +102,63 @@ test('production HXP packager derives deterministic integrity and a verifiable s
   ]), publicKey, signature), true);
 });
 
+test('local unsigned v2 packaging derives complete deterministic integrity without a key or signature', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'tsuyomi-hxp-unsigned-'));
+  const templatePath = join(directory, 'manifest.json');
+  const entryPath = join(directory, 'index.mjs');
+  const assetPath = join(directory, 'asset.txt');
+  const template = { ...validManifestTemplate(), manifestVersion: 2, signing: { algorithm: 'none' } };
+  await Promise.all([
+    writeFile(templatePath, JSON.stringify(template)),
+    writeFile(entryPath, 'export default {};\n'),
+    writeFile(assetPath, 'local package\n'),
+  ]);
+  const argumentsList = ['--manifest', templatePath, '--unsigned-local', '--file', `index.mjs=${entryPath}`, '--file', `assets/asset.txt=${assetPath}`];
+  const first = join(directory, 'first.hxp');
+  const second = join(directory, 'second.hxp');
+  await command(packager, [...argumentsList, '--output', first], directory);
+  await command(packager, [...argumentsList, '--output', second], directory);
+  const [firstBytes, secondBytes] = await Promise.all([readFile(first), readFile(second)]);
+  assert.deepEqual(firstBytes, secondBytes);
+  const entries = readStoredZip(firstBytes);
+  assert.deepEqual([...entries.keys()], ['manifest.json', 'assets/asset.txt', 'index.mjs']);
+  const manifest = JSON.parse(entries.get('manifest.json'));
+  assert.equal(manifest.manifestVersion, 2);
+  assert.deepEqual(manifest.signing, { algorithm: 'none' });
+  assert.deepEqual(manifest.integrity.files, {
+    'assets/asset.txt': sha256(entries.get('assets/asset.txt')),
+    'index.mjs': sha256(entries.get('index.mjs')),
+  });
+  assert.equal(manifest.integrity.contentDigest, sha256(Buffer.from(canonicalize(manifest.integrity.files), 'utf8')));
+  assert.deepEqual(entries.get('manifest.json'), Buffer.from(canonicalize(manifest)));
+});
+
+test('unsigned packaging rejects mixed signing flags, signed templates, disguised publisher identities, and reserved signature paths', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'tsuyomi-hxp-unsigned-reject-'));
+  const templatePath = join(directory, 'manifest.json');
+  const entryPath = join(directory, 'index.mjs');
+  const template = { ...validManifestTemplate(), manifestVersion: 2, signing: { algorithm: 'none' } };
+  await Promise.all([writeFile(templatePath, JSON.stringify(template)), writeFile(entryPath, 'export default {};\n')]);
+  const args = ['--manifest', templatePath, '--file', `index.mjs=${entryPath}`, '--output', join(directory, 'reject.hxp')];
+  await assert.rejects(command(packager, [...args, '--unsigned-local', '--private-key', 'unused.pem'], directory), /cannot be combined/);
+  await assert.rejects(command(packager, args, directory), /--private-key is required/);
+  await assert.rejects(command(packager, [...args, '--unsigned-local', '--unsigned-local'], directory), /only be supplied once/);
+  template.signing.keyId = 'forged-publisher';
+  await writeFile(templatePath, JSON.stringify(template));
+  await assert.rejects(command(packager, [...args, '--unsigned-local'], directory), /template.signing/);
+  template.signing = { algorithm: 'none' };
+  template.manifestVersion = 1;
+  await writeFile(templatePath, JSON.stringify(template));
+  await assert.rejects(command(packager, [...args, '--unsigned-local'], directory), /manifestVersion must be 2/);
+  template.manifestVersion = 2;
+  await writeFile(templatePath, JSON.stringify(template));
+  await assert.rejects(command(packager, [...args, '--unsigned-local', '--file', `signature.ed25519=${entryPath}`], directory), /reserved by the HXP format/);
+  await assert.rejects(command(packager, [...args, '--unsigned-local', '--file', `index.mjs=${entryPath}`], directory), /Duplicate --file/);
+  template.integrity = { algorithm: 'sha256', contentDigest: '0'.repeat(64), files: {} };
+  await writeFile(templatePath, JSON.stringify(template));
+  await assert.rejects(command(packager, [...args, '--unsigned-local'], directory), /must not provide integrity/);
+});
+
 test('HXP packager rejects templates that do not satisfy the pinned host schema', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'tsuyomi-hxp-schema-'));
   const privateKeyPath = join(directory, 'publisher.pem');

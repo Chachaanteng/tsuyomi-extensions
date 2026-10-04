@@ -40,7 +40,7 @@ CI rejects a mismatch. The deterministic fixture publisher key is public and
 **test-only**. Its private seed exists only in `tools/build-fixture.mjs`;
 production tooling retains only the public value needed to reject that key.
 
-## Production HXP packaging
+## Signed HXP packaging and unsigned local-only packaging
 
 `package:hxp` never creates, selects, persists, or defaults a key. Supply a
 custodian-owned Ed25519 PKCS#8 PEM/DER key, a JSON manifest template without an
@@ -56,6 +56,18 @@ npm run package:hxp -- \
 ```
 
 The template supplies all required HXP fields except `integrity`; the tool derives `integrity.files`, `contentDigest`, a canonical manifest, and the detached Ed25519 signature. Before signing, it validates that completed manifest against the pinned Apache-2.0 `schemas/hxp-manifest-v1.schema.json` (provenance in `EXTRACTION_PROVENANCE.md`) and applies the Android host's capability-policy admission rules, including canonical origin containment and remote-library operation constraints. It rejects entries over 8 MiB, more than 256 total archive files, manifests over 128 KiB, and archives over 16 MiB; it uses fixed ZIP metadata and refuses to overwrite an existing artifact. A generated HXP is not a release.
+
+For an intentionally **unsigned, local-file-only** HXP, use a `manifestVersion: 2` template whose `signing` is exactly `{ "algorithm": "none" }` (no `keyId` or `signatureFile`), and supply `--unsigned-local` **instead of** `--private-key`:
+
+```sh
+npm run package:hxp -- \
+  --manifest path/to/unsigned-v2-template.json \
+  --unsigned-local \
+  --file index.mjs=dist/modules/example/index.mjs \
+  --output .local/example-unsigned.hxp
+```
+
+The v2 path validates against the separately pinned `schemas/hxp-manifest-v2.schema.json`, derives complete integrity, and emits no signature entry. It refuses mixed key/unsigned flags, caller-provided integrity, or a disguised signing identity. SHA-256 is exact-file identification, **not publisher authentication**. This file must never enter a repository catalog or automatic update/release path; the host requires explicit informed consent for its exact bytes and capabilities. Reusing a source ID may expose existing source-scoped credentials even after uninstall. The signed v1 release preparation and publisher workflow are unchanged.
 
 ## Offline catalog generation
 

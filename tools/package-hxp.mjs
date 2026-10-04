@@ -28,13 +28,16 @@ const MAX_FILE_COUNT = 256;
 const KEY_ID = /^[A-Za-z0-9._-]{8,128}$/;
 
 const usage = `Usage:
-  node tools/package-hxp.mjs --manifest <template.json> --private-key <pkcs8.pem|der>
+  node tools/package-hxp.mjs --manifest <signed-v1-template.json> --private-key <pkcs8.pem|der>
     --output <extension.hxp> --file <archive-path=source-path> [--file ...]
+  node tools/package-hxp.mjs --manifest <unsigned-v2-template.json> --unsigned-local
+    --output <local-extension.hxp> --file <archive-path=source-path> [--file ...]
 
-The manifest template supplies the normal HXP fields, including \"entry\" and
-\"signing\". This command derives integrity.files, contentDigest, and the detached
-Ed25519 signature. It refuses the public deterministic test-fixture key and never
-creates or selects a signing key.`;
+The template supplies normal HXP fields including "entry" and "signing".
+The command derives complete integrity.files and contentDigest. Signed v1
+additionally derives an Ed25519 signature with an explicit non-fixture key.
+Unsigned v2 has no publisher key or signature; it is only for informed local
+file import, never repository distribution or a production release.`;
 const archivePathCompare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
 const fail = (message) => {
@@ -76,10 +79,10 @@ const compareHostSemVer = (left, right) => {
   return 0;
 };
 
-const manifestSchema = JSON.parse(await readFile(new URL('../schemas/hxp-manifest-v1.schema.json', import.meta.url), 'utf8'));
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 addFormats(ajv);
-const validateManifest = ajv.compile(manifestSchema);
+const validateSignedManifest = ajv.compile(JSON.parse(await readFile(new URL('../schemas/hxp-manifest-v1.schema.json', import.meta.url), 'utf8')));
+const validateUnsignedManifest = ajv.compile(JSON.parse(await readFile(new URL('../schemas/hxp-manifest-v2.schema.json', import.meta.url), 'utf8')));
 const assertCanonicalOrigin = (value, label) => {
   assertString(value, label, { min: 12, max: MAX_MANIFEST_BYTES });
   let url;
@@ -219,6 +222,11 @@ const parseArguments = (argumentsList) => {
       process.stdout.write(`${usage}\n`);
       process.exit(0);
     }
+    if (argument === '--unsigned-local') {
+      if (options['--unsigned-local']) fail('--unsigned-local may only be supplied once');
+      options['--unsigned-local'] = true;
+      continue;
+    }
     if (!['--manifest', '--private-key', '--output', '--file'].includes(argument)) fail(`Unknown option ${argument}`);
     const value = argumentsList[index + 1];
     if (value === undefined || value.startsWith('--')) fail(`${argument} requires a value`);
@@ -227,9 +235,11 @@ const parseArguments = (argumentsList) => {
     else if (options[argument] !== undefined) fail(`${argument} may only be supplied once`);
     else options[argument] = value;
   }
-  for (const required of ['--manifest', '--private-key', '--output']) {
+  for (const required of ['--manifest', '--output']) {
     if (options[required] === undefined) fail(`${required} is required`);
   }
+  if (options['--unsigned-local'] && options['--private-key']) fail('--unsigned-local and --private-key cannot be combined');
+  if (!options['--unsigned-local'] && !options['--private-key']) fail('--private-key is required unless --unsigned-local is explicitly selected');
   if (options.files.length === 0) fail('At least one --file is required');
   return options;
 };
@@ -255,18 +265,23 @@ const templateBytes = await readRequired(options['--manifest'], 'manifest templa
 const template = parseJsonWithUniqueKeys(templateBytes.toString('utf8'), 'HXP manifest template');
 assertObject(template, 'HXP manifest template');
 if (Object.hasOwn(template, 'integrity')) fail('HXP manifest template must not provide integrity; packaging derives it from --file inputs');
-assertExactKeys(template.signing, ['algorithm', 'keyId', 'signatureFile'], 'HXP manifest template.signing');
+const unsignedLocal = options['--unsigned-local'] === true;
+assertExactKeys(template.signing, unsignedLocal ? ['algorithm'] : ['algorithm', 'keyId', 'signatureFile'], 'HXP manifest template.signing');
 if (template.format !== 'tsuyomi-hxp') fail('HXP manifest template format must be tsuyomi-hxp');
-if (template.manifestVersion !== 1) fail('HXP manifest template manifestVersion must be 1');
+if (template.manifestVersion !== (unsignedLocal ? 2 : 1)) fail(`HXP manifest template manifestVersion must be ${unsignedLocal ? 2 : 1}`);
 parseHostSemVer(template.version, 'HXP manifest template.version');
 const hostMin = parseHostSemVer(template.hostApi?.minInclusive, 'HXP manifest template.hostApi.minInclusive');
 const hostMax = parseHostSemVer(template.hostApi?.maxExclusive, 'HXP manifest template.hostApi.maxExclusive');
 if (compareHostSemVer(hostMin, hostMax) >= 0) fail('HXP manifest template.hostApi must have minInclusive < maxExclusive');
 const entryPath = assertArchivePath(template.entry, 'HXP manifest template.entry');
 if (!entryPath.endsWith('.mjs') || entryPath.length > 512) fail('HXP manifest template.entry must be an HXP entry path');
-if (template.signing.algorithm !== 'Ed25519') fail('HXP manifest template.signing.algorithm must be Ed25519');
-assertString(template.signing.keyId, 'HXP manifest template.signing.keyId', { min: 8, max: 128, pattern: KEY_ID });
-if (template.signing.signatureFile !== 'signature.ed25519') fail('HXP manifest template.signing.signatureFile must be signature.ed25519');
+if (unsignedLocal) {
+  if (template.signing.algorithm !== 'none') fail('Unsigned local HXP manifest template.signing.algorithm must be none');
+} else {
+  if (template.signing.algorithm !== 'Ed25519') fail('HXP manifest template.signing.algorithm must be Ed25519');
+  assertString(template.signing.keyId, 'HXP manifest template.signing.keyId', { min: 8, max: 128, pattern: KEY_ID });
+  if (template.signing.signatureFile !== 'signature.ed25519') fail('HXP manifest template.signing.signatureFile must be signature.ed25519');
+}
 
 const files = await Promise.all(options.files.map(parseFileMapping));
 let suppliedContentBytes = 0;
@@ -278,17 +293,16 @@ for (const [archivePath, bytes] of files) {
   suppliedContentBytes += bytes.length;
   fileEntries.set(archivePath, bytes);
 }
-if (fileEntries.size + 2 > MAX_FILE_COUNT) fail(`HXP archive exceeds ${MAX_FILE_COUNT} regular entries`);
+if (fileEntries.size + (unsignedLocal ? 1 : 2) > MAX_FILE_COUNT) fail(`HXP archive exceeds ${MAX_FILE_COUNT} regular entries`);
 if (!fileEntries.has(entryPath)) fail(`HXP entry ${entryPath} is not supplied by --file`);
 
-const privateKey = readEd25519PrivateKey(await readRequired(options['--private-key'], 'private key'));
-if (ed25519PublicKeyBytes(privateKey).toString('base64') === FIXTURE_PUBLIC_KEY_BASE64) {
+const privateKey = unsignedLocal ? null : readEd25519PrivateKey(await readRequired(options['--private-key'], 'private key'));
+if (privateKey && ed25519PublicKeyBytes(privateKey).toString('base64') === FIXTURE_PUBLIC_KEY_BASE64) {
   fail('The deterministic public test-fixture key is forbidden for production HXP packaging');
 }
 
-const integrityFiles = Object.fromEntries([...fileEntries.entries()]
-  .sort(([left], [right]) => archivePathCompare(left, right))
-  .map(([archivePath, bytes]) => [archivePath, sha256(bytes)]));
+const sortedFileEntries = [...fileEntries.entries()].sort(([left], [right]) => archivePathCompare(left, right));
+const integrityFiles = Object.fromEntries(sortedFileEntries.map(([archivePath, bytes]) => [archivePath, sha256(bytes)]));
 const contentDigest = sha256(Buffer.from(canonicalize(integrityFiles), 'utf8'));
 const manifest = {
   ...template,
@@ -298,24 +312,26 @@ const manifest = {
     files: integrityFiles,
   },
 };
-if (!validateManifest(manifest)) fail(`HXP manifest violates pinned hxp-manifest-v1.schema.json: ${ajv.errorsText(validateManifest.errors)}`);
+const validateManifest = unsignedLocal ? validateUnsignedManifest : validateSignedManifest;
+const schemaName = `hxp-manifest-v${unsignedLocal ? 2 : 1}.schema.json`;
+if (!validateManifest(manifest)) fail(`HXP manifest violates pinned ${schemaName}: ${ajv.errorsText(validateManifest.errors)}`);
 assertCapabilitySemantics(manifest.capabilities);
 const canonicalManifest = Buffer.from(canonicalize(manifest), 'utf8');
 if (canonicalManifest.length > MAX_MANIFEST_BYTES) fail(`HXP manifest exceeds ${MAX_MANIFEST_BYTES} bytes`);
-const signature = sign(null, Buffer.concat([
+const signature = unsignedLocal ? null : sign(null, Buffer.concat([
   Buffer.from('tsuyomi-hxp-v1\0', 'ascii'),
   canonicalManifest,
   Buffer.from([0]),
   Buffer.from(contentDigest, 'ascii'),
 ]), privateKey);
-if (signature.length !== 64) fail('Ed25519 did not return a 64-byte signature');
-const uncompressedBytes = canonicalManifest.length + signature.length + suppliedContentBytes;
+if (signature !== null && signature.length !== 64) fail('Ed25519 did not return a 64-byte signature');
+const uncompressedBytes = canonicalManifest.length + (signature?.length ?? 0) + suppliedContentBytes;
 if (uncompressedBytes > MAX_UNCOMPRESSED_BYTES) fail(`HXP uncompressed content exceeds ${MAX_UNCOMPRESSED_BYTES} bytes`);
 
 const archive = zipStore([
   ['manifest.json', canonicalManifest],
-  ...[...fileEntries.entries()].sort(([left], [right]) => archivePathCompare(left, right)),
-  ['signature.ed25519', signature],
+  ...sortedFileEntries,
+  ...(signature === null ? [] : [['signature.ed25519', signature]]),
 ]);
 if (archive.length > MAX_PACKAGE_BYTES) fail(`HXP archive exceeds ${MAX_PACKAGE_BYTES} bytes`);
 const output = resolve(options['--output']);

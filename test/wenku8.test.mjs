@@ -96,6 +96,22 @@ test('redirected detail ignores earlier self-link chrome labels', () => {
   assert.equal(result.items[0]?.title, '文学少女');
 });
 
+test('closed same-origin zero-result search is empty without admitting wrong or incomplete pages', async () => {
+  const url = 'https://www.wenku8.net/modules/article/search.php?searchtype=articlename';
+  const empty = '<html><head><title>轻小说文库</title></head><body><div>“无匹配词”搜索结果</div><table class="grid"></table><div class="pager">1/1</div></body></html>';
+  assert.equal(classifyPage(empty, url, 'search'), 'ok');
+  assert.deepEqual(parseSearch(empty, url), { items: [], diagnostics: [] });
+  assert.equal(classifyPage(empty, 'https://other.example/modules/article/search.php', 'search'), 'malformed');
+  assert.equal(classifyPage(empty, undefined, 'search'), 'malformed');
+  assert.equal(classifyPage(empty.replace('</html>', ''), url, 'search'), 'malformed');
+  assert.equal(classifyPage(empty.replace('1/1', ''), url, 'search'), 'malformed');
+  assert.equal(classifyPage(empty.replace('搜索结果', '用户帮助'), url, 'search'), 'malformed');
+  assert.equal(classifyPage(empty.replace('</table>', '<tr><td><a href=/book/broken.htm>破损书卡</a></td></tr></table>'), url, 'search'), 'malformed');
+  assert.equal(classifyPage(empty.replace('</body>', '<form id="login">请先登录</form></body>'), url, 'search'), 'session-required');
+  assert.equal(classifyPage(`${empty}<div>cf-chl-verify</div>`, url, 'search'), 'verification-required');
+  assert.equal(classifyPage(await fixture('search'), url, 'search'), 'ok');
+});
+
 test('authenticated page markers override stale login chrome', () => {
   const html = `<div>${'<nav>item</nav>'.repeat(300)}<span>欢迎您，xfire233 [</span>${'<section>book</section>'.repeat(300)}<a href="logout.php">退出登录</a>]</div><form id="login">用户登录 验证码 captcha</form>`;
   assert.equal(classifyPage(html), 'ok');

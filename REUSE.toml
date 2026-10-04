@@ -10,7 +10,7 @@ SPDX-FileCopyrightText = "2026 Tsuyomi Contributors"
 SPDX-License-Identifier = "AGPL-3.0-only"
 
 [[annotations]]
-path = ["schemas/hxp-manifest-v1.schema.json"]
+path = ["schemas/hxp-manifest-v1.schema.json", "schemas/hxp-manifest-v2.schema.json"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Tsuyomi Contributors"
 SPDX-License-Identifier = "Apache-2.0"

@@ -11,12 +11,13 @@ extension.hxp
 ├── index.mjs
 ├── assets/
 ├── locales/
-└── signature.ed25519    # detached Ed25519 signature of canonical manifest.json
+└── signature.ed25519    # signed v1 only: detached Ed25519 signature
 ```
 
-`integrity.files` MUST contain every archive entry other than `manifest.json` and
-`signature.ed25519`; excluding those two avoids an impossible manifest self-digest. The detached
-signature authenticates the manifest and its integrity map.
+`integrity.files` MUST contain every archive entry other than `manifest.json` and, for signed v1,
+`signature.ed25519`; excluding those entries avoids an impossible manifest self-digest. Signed v1
+authenticates the manifest and integrity map with the detached signature. Explicit local-unsigned v2
+has no signature entry or publisher authentication; its integrity map only detects changed bytes.
 
 ## Rules
 
@@ -35,6 +36,8 @@ The Host API and package contract are versioned external interfaces. This reposi
 After compiling this checkout, `npm run release:prepare -- --revision <40-lowercase-hex-commit> --output <release-input.json>` reads the reviewed `release/sources.json` configuration and emits a canonical `tsuyomi-release-input` v1 bundle. The bundle carries the complete HXP manifest template, canonical base64 compiled files, language/license metadata, and any reviewed legacy migration binding. It has no integrity map, signature, private key, network activity, or executable packaging step. The protected publisher workflow replaces the neutral configured-publisher `keyId`, then uses the existing HXP packager and catalog generator from its pinned signing-tool checkout.
 
 `npm run package:hxp -- --help` is the explicit local/manual-import path for a production HXP: it requires supplied archive files, a complete manifest template (except generated integrity), and a custodian-owned Ed25519 PKCS#8 key. It validates the completed manifest using the pinned Apache-2.0 `schemas/hxp-manifest-v1.schema.json` recorded with an exact source/blob/content hash in `EXTRACTION_PROVENANCE.md`, then applies Android's additional capability-policy semantics (origin containment, operation/method pairing, and remote parameter requirements); it has no default key and rejects the deterministic fixture public key. It also rejects files/manifest/archive sizes outside the Android verifier's 8 MiB/128 KiB/16 MiB limits and more than 256 archive entries. A manually imported HXP is not a published release, and running this command does not authorize catalog publication.
+
+`package:hxp --unsigned-local` is a separate manually selected local-file-only path: its manifest template has `manifestVersion: 2` and precisely `signing: { "algorithm": "none" }`; it accepts compiled `--file` inputs but never takes a key or emits a signature entry. The separately vendored v2 schema and the same Android capability/archive limits apply. An archive digest detects changed bytes but proves no publisher identity, so the host requires an exact-byte informed consent, including the risk of source-scoped existing credentials. Repository generation, reviewed release input, and protected signing continue to require signed v1; no v2 is distributable by them.
 
 The catalog generator derives publisher fingerprints from raw base64 Ed25519 public keys and rejects duplicate JSON keys, unsupported fields, Android-incompatible SemVer values, oversized catalogs, ambiguous identifiers, invalid revision/digest formats, and raw non-HTTPS credential/fragment URI input. It canonicalizes accepted package URLs to the exact ASCII strings it signs. See the root README for command and input examples.
 

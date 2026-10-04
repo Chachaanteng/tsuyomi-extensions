@@ -306,6 +306,22 @@ const sessionRemediation = (html: string): 'session-required' | 'verification-re
   return null;
 };
 
+const looksLikeEmptySearch = (html: string, finalUrl: string | undefined): boolean => {
+  if (!finalUrl || !/^https:\/\/www\.wenku8\.net\/modules\/article\/search\.php(?:[?#]|$)/i.test(finalUrl)) return false;
+  const opening = /<html\b[^>]*>/i.exec(html);
+  if (!opening || !/<\/html>\s*$/i.test(html) || balancedElementBody(html, opening.index + opening[0].length, 'html') === null) return false;
+  const text = stripTags(html);
+  // Wenku8 keeps the search-result heading and a single-page pager even when there are no rows.
+  // Neither a blank page nor an incomplete result-card list is evidence of an empty query.
+  if (!/搜索结果/u.test(text) || !/\b1\s*\/\s*1\b/u.test(text)) return false;
+  const anchors = /<a\b([^>]*)>/gi;
+  for (let match = anchors.exec(html); match; match = anchors.exec(html)) {
+    const href = attribute(match[1] ?? '', 'href');
+    if (href && /(?:\/book\/|articleinfo\.php)/i.test(href)) return false;
+  }
+  return true;
+};
+
 const looksLikeDetail = (html: string): boolean => {
   const hasTitle = /<h1\b[^>]*>[\s\S]*?<\/h1>/i.test(html) || hasConcreteDetailDocument(html);
   const hasAuthor = /(?:小说作者|文章作者|作者)\s*[：:]/i.test(html);
@@ -377,7 +393,7 @@ export const classifyPage = (
   if (remediation !== null) return remediation;
   if (operation === 'search') {
     const redirected = finalUrl ? bookIdentityFromUrl(finalUrl) : null;
-    return (redirected !== null && looksLikeDetail(html)) || hasConcreteBookAnchor(html) ? 'ok' : 'malformed';
+    return (redirected !== null && looksLikeDetail(html)) || hasConcreteBookAnchor(html) || looksLikeEmptySearch(html, finalUrl) ? 'ok' : 'malformed';
   }
   if (operation === 'home') {
     return hasConcreteBookAnchor(html) ? 'ok' : 'malformed';
@@ -480,7 +496,7 @@ export const parseSearch = (
     });
     seen.add(identity.remoteBookId);
   }
-  if (!items.length && stripTags(html)) diagnostics.push({ stage: 'search-parse', safeCode: 'no-valid-book-cards' });
+  if (!items.length && stripTags(html) && !looksLikeEmptySearch(html, finalUrl)) diagnostics.push({ stage: 'search-parse', safeCode: 'no-valid-book-cards' });
   return { items, diagnostics };
 };
 
