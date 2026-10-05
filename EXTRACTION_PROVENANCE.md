@@ -39,6 +39,8 @@ created by this transition.
 
 The production HXP packager validates its completed manifest against the verbatim Apache-2.0 `hxp-manifest-v1.schema.json` copied from `Xfire233/Tsuyomi` checkpoint `09e0cb7`, path `tsuyomi-protocol/schemas/hxp-manifest-v1.schema.json`. The source and vendored Git blob is `af1107f7987386c07ae9d4646a635f354cb50355`; its content SHA-256 is `1ff7d570d702229539317f54951ea53dfb7aa50a1c31d5f79287c967b47bbeb2`. The Apache-2.0 text and notice are retained; this is a pinned compatibility input, not a sibling-directory dependency or a protocol release claim.
 
+The separate local-unsigned `schemas/hxp-manifest-v2.schema.json` is derived from the Apache-2.0 protocol v1 shape: it retains the common manifest constraints, changes only manifest version to `2`, requires signing to be exactly `{ "algorithm": "none" }`, and forbids publisher key/signature fields. It is copied verbatim from `Xfire233/Tsuyomi` commit `981e97b1e5a1e8ae43e9ad3957d3f3c18d1aef1d`, path `tsuyomi-protocol/schemas/hxp-manifest-v2.schema.json`; both files have SHA-256 `8f33526b6ef302ae07a869eca880cc1948683eb46bc4a3d3060d58f245e4155a`. Its Apache-2.0 notice is retained in `REUSE.toml`. This immutable source revision is not a protocol release tag or a sibling-directory build dependency. The v1 vendored file and its pinned provenance above remain unchanged, as does the protected release workflow.
+
 ## Publication boundary
 
 This source repository contains build inputs, offline signing tools and an

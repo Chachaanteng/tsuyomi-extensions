@@ -3,7 +3,7 @@
 
 # Contributing
 
-- Extensions are TypeScript ES modules packaged as signed `.hxp` archives; APK-based extensions are out of scope.
+- Extensions are TypeScript ES modules packaged as signed v1 `.hxp` for repository delivery; explicitly selected unsigned v2 files are only for informed local-file import. APK-based extensions are out of scope.
 - Add every domain, cookie scope, controlled WebView request, and storage requirement to the manifest.
 - Do not automate CAPTCHA, Cloudflare, or anti-bot verification. The host may only let the user complete these flows in a controlled WebView.
 - Use sanitized fixtures, never credentials, cookies, copyrighted chapter payloads, or live-site CI dependencies.
@@ -13,4 +13,4 @@
 - Dependency changes must update lock state, `THIRD_PARTY_NOTICES.md`, REUSE metadata, and package verification evidence together.
 - Bind each package to an explicit reviewed Host API/protocol revision; never test against an unpinned sibling checkout or `latest` contract.
 - Run `npm ci` and `npm test`. Contributor CI also regenerates the AGPL test fixture automatically; do not commit regenerated fixture binaries or SHA files just to satisfy CI, and never alter the pinned historical host replay fixture. The fixture's public key is test-only and production tools reject it.
-- `npm run release:prepare -- --revision <40-lowercase-hex-commit> --output <release-input.json>` builds an unsigned, data-only release input from reviewed sources and compiled files. It does not sign, package, publish, or authorize a release; the protected publisher workflow alone supplies production keys. A manually imported local HXP must be made with `package:hxp` and an explicit non-fixture custodian key, and is not a published release.
+- `npm run release:prepare -- --revision <40-lowercase-hex-commit> --output <release-input.json>` builds an unsigned, data-only release input from reviewed sources and compiled files. It does not sign, package, publish, or authorize a release; the protected publisher workflow alone supplies production keys. A manually imported signed v1 HXP requires `package:hxp --private-key` and an explicit non-fixture custodian key. A genuine local-unsigned v2 HXP requires `package:hxp --unsigned-local` and the keyless v2 manifest; it is never a published release or automatic update.
