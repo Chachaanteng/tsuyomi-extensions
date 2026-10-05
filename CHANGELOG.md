@@ -16,6 +16,8 @@
 
 ### Changed
 
+- Bump the production Wenku8 package to `0.2.38` for the reviewed source corrections, avoiding replacement of the immutable published `0.2.37` bytes. Signed manifest v1 and Host API compatibility `[1.2.0, 2.0.0)` are unchanged; the protected release/catalog bind the exact signed HXP digest to the new version.
+
 - Reuse one archive-path-sorted file list for integrity and ZIP assembly, removing the duplicate copy/sort without changing signed-v1 or local-unsigned-v2 bytes. The vendored v2 schema retains its Apache-2.0 notice.
 
 - Cacheable reads now declare `default` instead of `network-only`, so the host cache can actually serve them. Every request in this source declared `network-only`, which meant the host cache was never read: the detail page, its chapter index, home pages, search results and chapter pages were fetched over the network on every visit even when the host held a valid entry. Detail, directory, chapter, home and search now declare `default`; the update check and the five remote-library operations keep `network-only`, which is what the host enforces for them. Manual caching still selects which chapters to keep offline; it is no longer the only path by which anything becomes cacheable. Published as `0.2.37`; a repeat visit to a book now serves the detail page and directory from the host cache, confirmed on the maintainer's phone by the absence of any verified-transport fetch on the second visit.
